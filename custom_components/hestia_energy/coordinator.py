@@ -48,10 +48,16 @@ DEFAULTS = {"kva": None, "option": None, "margin": 0.1, "watched": {"seche_servi
             "water_price": None,
             # What a stove declared as gas in the Energy page burns: « pellets », « gas », or None (not said yet).
             "stove_fuel": None,
+            # The Hestia Weather place that gives the cold of each day (its entry id); None: the only one, or the first.
+            "weather_place": None,
             # The group of each device ({statistic: « chauffage »…}), when the guess from its name is wrong (H5).
             "groups": {},
             # Each extension used or not ({« tic »: False…}); absent means used (H8).
             "extensions": {}}
+
+
+def _weather_updated() -> None:
+    """Hestia Weather recomputed the place: nothing to do here (the cold is read at the hourly refresh)."""
 
 
 class EnergyCoordinator:
@@ -68,6 +74,9 @@ class EnergyCoordinator:
         self.colours: dict[date, str] = {}
         self.cold: dict[date, float] = {}
         self.weather_cold = "non"
+        self.weather: dict = {"etat": "non", "lieu": None, "nom": None, "lieux": [], "choisi": False}
+        self._cold_place: str | None = None          # the Weather place the kept cold was read from (None: not said)
+        self._weather_stop = None                    # stops listening to that place
         self._sent_on: date | None = None
         self.panel_names: dict[str, str] = {}
         self.device_names: dict[str, str] = {}
@@ -113,7 +122,9 @@ class EnergyCoordinator:
         reached) is decided here; their values come with the first reports, in the background."""
         self.settings.update(await self.store.async_load() or {})
         kept = await self.cold_store.async_load() or {}
-        self.cold = {date.fromisoformat(d): v for d, v in kept.items()}
+        # « lieu »: the Weather place the days were read from (absent before 17 Nov. 2026: kept for the place found first).
+        self._cold_place = kept.get("lieu")
+        self.cold = {date.fromisoformat(d): v for d, v in kept.items() if d != "lieu"}
         self.colours = {date.fromisoformat(d): c for d, c in (await self.colour_store.async_load() or {}).items()}
         # The regulated tariffs embedded in the brick: a file, read in a worker thread (never on the loop).
         self.table = await self.hass.async_add_executor_job(tariff.load_regulated)
@@ -166,6 +177,9 @@ class EnergyCoordinator:
             if cancel:
                 cancel()
         self._live_unsub = self._live_pending = self._retry = None
+        if self._weather_stop:
+            self._weather_stop()
+            self._weather_stop = None
         self._unsubs.clear()
         self._listeners.clear()
 
@@ -358,6 +372,7 @@ class EnergyCoordinator:
                     self.locality[entity] = await reader.is_local(self.hass, entity)
         if self.extras.get("inverter") and self.extras["inverter"] not in self.locality:
             self.locality[self.extras["inverter"]] = await reader.is_local(self.hass, self.extras["inverter"])
+        self._follow_weather()
         await self._fetch_cold(now)
         await self._fetch_colours(now)
         prices, export_price = self._prices(), self._export_price()
@@ -365,7 +380,6 @@ class EnergyCoordinator:
         self.panel_names = {c: solar.panel_name(_friendly(self.hass, c)) for c in self.extras["channels"]}
         self.device_names = {m.stat: _device_name(_friendly(self.hass, m.stat)) for m in self.page.devices if not m.name}
         self.inverter_silent = self._inverter_silent()
-        self.weather_cold = reader.weather_cold(self.hass) if self.used("meteo") else "non"
         if self._stopped:
             return
         self._follow_live()
@@ -383,21 +397,46 @@ class EnergyCoordinator:
             self.colours.update(new)
             await self.colour_store.async_save({d.isoformat(): c for d, c in self.colours.items()})
 
+    def _follow_weather(self) -> None:
+        """The Hestia Weather place that gives the cold (chosen in the settings, else the only or the first one), and
+        listening to it, so that Weather shows Énergie linked to this place. Listened to again at each refresh: a place
+        reloaded in Weather (its settings changed) has forgotten its listeners. Nothing is done when it updates: the
+        cold is read at the hourly refresh, and Weather updates every minute."""
+        self.weather = reader.weather_place(self.hass, self.settings.get("weather_place")) if self.used("meteo") \
+            else {"etat": "non", "lieu": None, "nom": None, "lieux": [], "choisi": False}
+        self.weather_cold = self.weather["etat"]
+        if self._weather_stop:
+            self._weather_stop()
+            self._weather_stop = None
+        if self.weather_cold == "oui" and not self._stopped:
+            self._weather_stop = reader.weather_listen(self.hass, self.weather["lieu"], _weather_updated)
+
     async def _fetch_cold(self, now: datetime) -> None:
         """The degree-days of the year from Hestia Weather: the past days missing, and today (still a forecast)."""
-        if not self.used("meteo") or reader.weather_cold(self.hass) != "oui":
+        if self.weather_cold != "oui":
             return
+        place = self.weather["lieu"]
+        if self._cold_place is not None and self._cold_place != place:
+            # Another place: the days kept are another place's cold, read again from the new one.
+            self.cold.clear()
+            self._cold_asked.clear()
+        if self._cold_place != place:
+            self._cold_place = place
+            await self._save_cold(now.astimezone(self.tz).date())
         today = now.astimezone(self.tz).date()
         first = today - timedelta(days=YEAR_DAYS)
         wanted = [first + timedelta(days=i) for i in range((today - first).days + 1)]
         # A past day Weather could not give (before its station, a gap) is asked again the next day, not every hour.
         missing = [d for d in wanted if d == today or (d not in self.cold and self._cold_asked.get(d) != today)]
-        found = await reader.degree_days(self.hass, missing)
+        found = await reader.degree_days(self.hass, missing, place)
         self._cold_asked.update({d: today for d in missing if d not in found and d < today})
         past = {d: v for d, v in found.items() if d < today and d not in self.cold}
         self.cold.update(found)
         if past:
-            await self.cold_store.async_save({d.isoformat(): v for d, v in self.cold.items() if d < today})
+            await self._save_cold(today)
+
+    async def _save_cold(self, today: date) -> None:
+        await self.cold_store.async_save({"lieu": self._cold_place, **{d.isoformat(): v for d, v in self.cold.items() if d < today}})
 
     def _source(self) -> dict:
         """The consumption source (D21): which meters the page buys with, where each comes from, and the official
@@ -417,7 +456,13 @@ class EnergyCoordinator:
         """The heating estimated from the cold (9.2): one figure for this month and one for last winter, or why not."""
         stove = self._stove(local)
         if weather != "oui":
-            return {"etat": "sans_meteo" if weather == "non" else "meteo_ancienne", "poele": stove}
+            state = {"non": "sans_meteo", "ancienne": "meteo_ancienne", "incompatible": "meteo_incompatible",
+                     "sans_lieu": "meteo_sans_lieu"}.get(weather, "sans_meteo")
+            return {"etat": state, "poele": stove}
+        if not any(d < local.date() for d in self.cold):
+            # Weather is there but gives no past day: its place has no temperature sensor, or none old enough. Said,
+            # never left « learning » for ever.
+            return {"etat": "meteo_sans_donnees", "lieu": self.weather.get("nom"), "poele": stove}
         used = home.used_days()
         learned = heating.learn(used, self.cold)
         if learned is None:

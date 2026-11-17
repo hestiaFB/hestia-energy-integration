@@ -183,13 +183,15 @@ SETTINGS = vol.Schema({
     vol.Optional("subscription"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=5000))),
     vol.Optional("water_price"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=50))),
     vol.Optional("stove_fuel"): vol.Any(None, vol.In(("pellets", "gas"))),
+    # the Hestia Weather place (its entry id) that gives the cold; None: the only one, or the first
+    vol.Optional("weather_place"): vol.Any(None, vol.All(str, vol.Length(min=1, max=64))),
     **{vol.Optional(k): bool for k in ("notify_day", "notify_week", "notify_month", "notify_leak", "notify_forgot")},
     vol.Optional("groups"): {str: vol.In(hub.GROUPS)},
     vol.Optional("extensions"): {vol.In(_EXTENSIONS): bool},
 })
 KEYS = ("kva", "margin", "export_price", "option", "bag_price", "notify_service", "notify_hour", "offpeak", "offer", "price_hp",
         "price_hc", "price_base", "subscription", "water_price", "stove_fuel", "notify_day", "notify_week", "notify_month",
-        "notify_leak", "notify_forgot", "groups", "extensions")
+        "notify_leak", "notify_forgot", "groups", "extensions", "weather_place")
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hestia_energy/settings"})

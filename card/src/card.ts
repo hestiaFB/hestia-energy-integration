@@ -426,6 +426,9 @@ class HestiaEnergyCard extends LitElement {
   const head={ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'depuis le 1er octobre',over};
   const why:Record<string,string>={sans_meteo:'Pour estimer les radiateurs, Hestia a besoin du froid de chaque jour : ajoutez Hestia Météo.',
    meteo_ancienne:'Pour estimer les radiateurs, Hestia a besoin du froid de chaque jour : mettez Hestia Météo à jour.',
+   meteo_incompatible:'Hestia Météo n\'a pas la même version qu\'Énergie : mettez les deux à jour ensemble.',
+   meteo_sans_lieu:'Pour estimer les radiateurs, ajoutez votre maison dans Hestia Météo.',
+   meteo_sans_donnees:'Hestia Météo ne donne pas le froid des jours passés : choisissez un capteur de température dans ses réglages.',
    apprend:'Il faut quelques semaines de froid pour estimer les radiateurs. Revenez cet hiver.',
    peu_lie:'Votre électricité varie peu avec le froid : vous chauffez sans doute surtout avec une autre énergie.'};
   const how='Radiateurs : estimés en comparant chaque jour votre électricité au froid qu\'il a fait.';

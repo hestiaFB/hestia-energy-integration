@@ -4,6 +4,13 @@
 
 Première préversion (paliers 0 et 1). Pas encore publiée.
 
+### Le froid de chaque jour, avec plusieurs lieux dans Hestia Météo (17 nov. 2026)
+- Corrigé : avec deux lieux ou plus dans Hestia Météo, Énergie ne recevait aucun degré-jour et le chauffage restait « en apprentissage » sans rien dire. Énergie demande maintenant le froid d'un lieu précis.
+- Le lieu se choisit dans Extensions › Hestia Météo. En attendant, Énergie prend le premier lieu et le dit dans « À régler ».
+- Énergie vérifie que Hestia Météo parle la même version de son interface (version 1), et se déclare auprès d'elle : les réglages de Hestia Météo montrent Énergie reliée à ce lieu.
+- Quand le froid manque, Énergie dit pourquoi (Hestia Météo trop ancienne, d'une autre version, sans lieu, ou sans capteur de température pour les jours passés), dans « À régler », sur la page de l'extension et sur la carte Chauffage.
+- Changer de lieu relit le froid de la nouvelle maison au lieu de mélanger les deux.
+
 ### Onglet Énergie refait (maquette du hub, 8 nov. 2026)
 - Le même menu que Confort et Météo : Vue d'ensemble · Sources · Appareils · Réglages · Extensions · Bilan · À propos. La page Contrat disparaît : ses réglages sont dans Réglages. Appareils n'apparaît que s'il y en a.
 - Vue d'ensemble : ce que fait Énergie avec un exemple tiré de la maison, ce qui reste à régler (avec sa cause probable), trois chiffres, ce qui apporterait plus, les derniers bilans. Le mot « palier » disparaît.

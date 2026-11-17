@@ -231,27 +231,69 @@ async def is_local(hass: HomeAssistant, entity_id: str) -> bool | None:
 # --- What the other Hestia bricks give (their public interfaces, never their insides) ----------------------------
 
 WEATHER_API = "hestia_weather_api"
+WEATHER_API_VERSION = 1      # the version of Hestia Weather's interface this brick speaks
+BRICK = "hestia_energy"      # said to Hestia Weather when listening, so that its settings show this brick linked
 
 
-def weather_cold(hass: HomeAssistant) -> str:
-    """Can Hestia Weather give the degree-days? « oui », « ancienne » (installed, too old for `degree_days`), « non »."""
+def weather_api(hass: HomeAssistant):
+    """Hestia Weather's interface when it speaks the version this brick knows, else None (absent or another version)."""
+    api = hass.data.get(WEATHER_API)
+    return api if api is not None and getattr(api, "version", None) == WEATHER_API_VERSION else None
+
+
+def weather_place(hass: HomeAssistant, chosen: str | None = None) -> dict:
+    """Which Hestia Weather place gives the cold of each day, and whether it can.
+
+    `etat`: « oui »; « non » (not installed); « incompatible » (another version of its interface); « ancienne » (too old
+    for the degree-days); « sans_lieu » (no place set up in it yet). `lieu` and `nom`: the place used; `lieux`: every
+    place, for the settings. The place chosen in the settings when it still exists; else the only one; else the first
+    set up (usually the home's), with `choisi` False so that the settings offer the choice. Never an error: another
+    brick's trouble never stops this one."""
+    out = {"etat": "non", "lieu": None, "nom": None, "lieux": [], "choisi": False}
     api = hass.data.get(WEATHER_API)
     if api is None:
-        return "non"
-    return "oui" if hasattr(api, "degree_days") else "ancienne"
+        return out
+    if getattr(api, "version", None) != WEATHER_API_VERSION:
+        return {**out, "etat": "incompatible"}
+    if not hasattr(api, "degree_days"):
+        return {**out, "etat": "ancienne"}
+    try:
+        places = [{"entry_id": p["entry_id"], "title": p.get("title") or ""} for p in api.places()]
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Hestia Weather's places unavailable: %s", err)
+        places = []
+    if not places:
+        return {**out, "etat": "sans_lieu"}
+    found = next((p for p in places if chosen and p["entry_id"] == chosen), None)
+    place = found or places[0]
+    return {"etat": "oui", "lieu": place["entry_id"], "nom": place["title"], "lieux": places,
+            "choisi": found is not None or len(places) == 1}
 
 
-async def degree_days(hass: HomeAssistant, days: list) -> dict:
-    """Each day's heating degree-days from Hestia Weather ({date: DJU}); a day it cannot give is left out."""
-    api = hass.data.get(WEATHER_API)
+def weather_listen(hass: HomeAssistant, place: str, update) -> Callable[[], None]:
+    """Listens to this Hestia Weather place, saying who listens: Weather's settings then show Énergie linked to it."""
+    api = weather_api(hass)
+    if api is None or not place:
+        return lambda: None
+    try:
+        return api.add_listener(place, update, brick=BRICK)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Hestia Weather not listened to: %s", err)
+        return lambda: None
+
+
+async def degree_days(hass: HomeAssistant, days: list, place: str | None) -> dict:
+    """Each day's heating degree-days from this Hestia Weather place ({date: DJU}); a day it cannot give is left out.
+    Without a place nothing is asked: with several places, Weather answers none without being told which."""
+    api = weather_api(hass)
     out = {}
-    if api is None or not hasattr(api, "degree_days"):
+    if api is None or not place or not hasattr(api, "degree_days"):
         return out
     for n, day in enumerate(days):
         if n % 10 == 9:
             await asyncio.sleep(0)   # a year asked at start: the loop breathes between days (0.19 s held at once before)
         try:
-            found = await api.degree_days(day)
+            found = await api.degree_days(day, place)
         except Exception as err:  # noqa: BLE001 - another brick's trouble never stops this one
             _LOGGER.debug("Degree-days of %s unavailable: %s", day, err)
             continue

@@ -33,6 +33,36 @@ EXTENSIONS = (
      "Le poêle n’est pas compté.", None),
 )
 RUNNING_W = 50
+# What keeps Hestia Weather from giving the cold of each day, by the state found (coordinator._follow_weather and
+# _heating): [title, what to do]. Said in « À régler » and on Hestia Météo's page, never left silent.
+WEATHER_PROBLEMS = {
+    "incompatible": ("Hestia Météo n’a pas la même version",
+                     "Elle parle une autre version que celle d’Énergie : mettez Hestia Énergie et Hestia Météo à jour ensemble."),
+    "ancienne": ("Hestia Météo est trop ancienne", "Elle ne donne pas encore le froid de chaque jour : mettez-la à jour."),
+    "sans_lieu": ("Hestia Météo n’a pas de lieu", "Ajoutez votre maison dans Hestia Météo : le froid de chaque jour vient d’elle."),
+    "sans_donnees": ("Hestia Météo ne donne pas le froid des jours passés",
+                     "Choisissez un capteur de température extérieure dans les réglages de Hestia Météo{lieu}. "
+                     "En attendant, le chauffage n’est pas comparé au froid."),
+}
+
+
+def weather_problem(hass, c) -> dict | None:
+    """Why Hestia Weather, installed and used, gives no cold to Énergie ({titre, texte}); or, with several places and
+    none chosen, which one is taken. None when all is well, or when Weather is not there (an extension, not a fault)."""
+    if not c.used("meteo") or "hestia_weather" not in hass.config.components:
+        return None
+    state = c.weather_cold
+    weather = c.weather or {}
+    if state == "oui" and (c.data.get("chauffage") or {}).get("etat") == "meteo_sans_donnees":
+        state = "sans_donnees"
+    if state in WEATHER_PROBLEMS:
+        title, text = WEATHER_PROBLEMS[state]
+        return {"titre": title, "texte": text.format(lieu=f" (lieu « {weather['nom']} »)" if weather.get("nom") else "")}
+    if state == "oui" and not weather.get("choisi"):
+        return {"titre": "Quel lieu de Hestia Météo est la maison ?",
+                "texte": f"Hestia Météo a {len(weather.get('lieux') or [])} lieux : Énergie prend « {weather.get('nom')} » "
+                         "en attendant votre choix."}
+    return None
 
 
 def _friendly(hass, entity_id: str | None) -> str | None:
@@ -136,6 +166,8 @@ def todos(hass, c) -> list[dict]:
                                               (f"avec {c.contract.kva if c.contract else 6} kVA", kva_missing)) if on)
         out.append({"titre": "Dites-nous votre contrat", "page": "reglages",
                     "texte": f"{what[0].upper() + what[1:]} : c’est écrit sur votre facture. En attendant, Hestia compte {meanwhile}."})
+    if problem := weather_problem(hass, c):
+        out.append({**problem, "page": "extensions/meteo"})
     contract = c.contract
     if contract is not None and contract.option == tariff.HPHC and c.offpeak is None:
         out.append({"titre": "Indiquez vos heures creuses", "texte": "Un seul compteur : Hestia ne peut pas les lire.",
@@ -359,9 +391,17 @@ def build_extensions(hass, c, devices: list[dict]) -> list[dict]:
         "vt": ([f"{heaters} chauffage{'s' if heaters > 1 else ''}"] if heaters else []) + ["Délestage"],
         "pellets": ["Poêle à granulés"],
     }
-    return [{"id": key, "groupe": group, "nom": name, "usage": use, "sans": without, "lien": link,
-             "installee": installed[key], "utilisee": c.used(key), "ou": where[key]}
-            for key, group, name, use, without, link in EXTENSIONS]
+    problem = weather_problem(hass, c)
+    weather = c.weather or {}
+    out = [{"id": key, "groupe": group, "nom": name, "usage": use, "sans": without, "lien": link,
+            "installee": installed[key], "utilisee": c.used(key), "ou": where[key], "probleme": None}
+           for key, group, name, use, without, link in EXTENSIONS]
+    for ext in out:
+        if ext["id"] == "meteo":
+            # The place that gives the cold, and the others to choose from (several places in Weather).
+            ext.update({"probleme": problem, "lieu": weather.get("lieu"), "lieu_nom": weather.get("nom"),
+                        "lieux": [{"id": p["entry_id"], "nom": p["title"]} for p in weather.get("lieux") or []]})
+    return out
 
 
 # --- The whole tab ----------------------------------------------------------------------------------------------------

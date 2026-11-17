@@ -14,7 +14,8 @@ type Source={id:string;groupe:string;nom:string;usage:string;etat:'ok'|'todo';so
 type Device={id:string;stat:string;nom:string;sans_nom:boolean;groupe:string;groupe_devine:string;kwh:number|null;euros:number|null;w:number|null;
  a_regler:string|null;a_regler_detail:string|null;via:string;corrige:string[];dans:string|null;puissance:string|null;
  mesure_par:string|null;integration:string|null;piece:string|null;nom_compteur:string;nom_puissance:string|null;w_direct:number|null};
-type Ext={id:string;groupe:string;nom:string;usage:string;sans:string;lien:string|null;installee:boolean;utilisee:boolean;ou:string[]};
+type Ext={id:string;groupe:string;nom:string;usage:string;sans:string;lien:string|null;installee:boolean;utilisee:boolean;ou:string[];
+ probleme?:{titre:string;texte:string}|null;lieu?:string|null;lieu_nom?:string|null;lieux?:{id:string;nom:string}[]};
 type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[];a_ameliorer:Todo[];veille:{w:number;euros_par_an:number|null}|null;
  mois:Period|null;projection:number|null;mois_an_dernier:Period|null;douze_mois:{euros:number|null;du:string;au:string;soleil_couvre:number|null;revendu_euros:number|null}|null;
  bilans:{id:string;titre:string;texte:string;euros:number|null;kwh:number}[];chauffage:{etat:string;mois?:{kwh:number;eur:number|null}|null;poele?:{saison?:{kg:number;eur:number|null}}|null}|null;
@@ -346,7 +347,7 @@ export class HestiaEnergySetup extends LitElement {
   const groups=[...new Set(h.extensions.map(e=>e.groupe))];
   return html`${this.head('Extensions',{lead:'Les autres briques Hestia-FB et les intégrations qu’Énergie lit'})}
    ${groups.map(g=>listSection(g,h.extensions.filter(e=>e.groupe===g).map(e=>listRow({label:e.nom,name:e.nom,control:true,
-    sub:!e.installee?'Pas installée':this.used(e)?e.usage:'Pas utilisée',
+    sub:!e.installee?'Pas installée':!this.used(e)?'Pas utilisée':e.probleme?e.probleme.titre:e.usage,level:e.installee&&this.used(e)&&e.probleme?'todo':undefined,
     value:e.installee?toggle('Utiliser '+e.nom,this.used(e),on=>this.setUsed(e,on)):nothing,go:()=>this.go('extensions/'+e.id)}))))}`;
  }
  private extensionPage(h:Hub,id:string){
@@ -356,6 +357,12 @@ export class HestiaEnergySetup extends LitElement {
   return html`${this.head(e.nom,{back:['extensions','Extensions'],lead:e.usage})}
    ${listSection('',[e.installee?listRow({label:'Utiliser dans Énergie',control:true,sub:on?undefined:'Énergie l’ignore, sans rien désinstaller.',value:toggle('Utiliser dans Énergie',on,x=>this.setUsed(e,x))})
     :listRow({label:'Pas installée dans Home Assistant',value:html`<a class="ext-act" href=${link} target=${e.lien?'_blank':'_self'} rel="noreferrer">${e.id==='tic'?'Voir les modules':e.lien?'Voir le projet':'Ouvrir HACS'}</a>`})])}
+   ${e.installee&&on&&e.probleme?listSection('À régler',[listRow({label:html`<b>${e.probleme.titre}</b>`,sub:e.probleme.texte,level:'todo'})]):nothing}
+   ${e.installee&&on&&(e.lieux?.length??0)>1?listSection('Le lieu',[listRow({label:'La maison est',control:true,
+     sub:this.val<string|null>('weather_place')?'Choisi par vous.':'Pris en attendant votre choix : le premier lieu de Hestia Météo.',
+     value:html`<select aria-label="Lieu de Hestia Météo" @change=${(ev:Event)=>this.set('weather_place',(ev.target as HTMLSelectElement).value)}>
+      ${e.lieux!.map(p=>html`<option value=${p.id} ?selected=${e.lieu===p.id}>${p.nom}</option>`)}</select>`})],
+     {help:'Le froid de chaque jour vient de ce lieu de Hestia Météo. Choisissez celui de la maison chauffée.'}):nothing}
    ${listSection('Ce qu’elle change',[
     ...(e.installee&&e.ou.length?[listRow({label:html`<b>Avec elle</b>`,sub:`Elle sert à : ${e.ou.join(', ')}.`})]:[]),
     listRow({label:html`<b>Sans elle</b>`,sub:e.sans})])}`;

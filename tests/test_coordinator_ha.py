@@ -310,8 +310,16 @@ class FranksHome(unittest.IsolatedAsyncioTestCase):
         cold = {d + shift: v for d, v in degree_days().items()}
 
         class Weather:
+            version = 1
+
+            def places(self):
+                return [{"entry_id": "maison", "title": "Maison"}]
+
+            def add_listener(self, entry_id, update, brick=None):
+                return lambda: None
+
             async def degree_days(self, day, entry_id=None):
-                return None if day not in cold else {"heating": cold[day]}
+                return None if day not in cold or entry_id != "maison" else {"heating": cold[day]}
 
         _, coordinator = await self.setup()
         self.assertEqual(coordinator.data["chauffage"]["etat"], "sans_meteo")
