@@ -1,3 +1,9 @@
+## À venir
+
+### Corrections
+
+- Page Chauffe-eau : la prise et la sonde se choisissent avec le sélecteur de Home Assistant, comme dans Hestia Confort, avec sa recherche. La liste ne montre plus que ce qui peut servir : pas les réglages ni les diagnostics des autres appareils (les options d’une caméra, par exemple), pas les entités masquées.
+
 ## 1.0.1b1 — Le chauffe-eau piloté
 
 ### Nouveautés
