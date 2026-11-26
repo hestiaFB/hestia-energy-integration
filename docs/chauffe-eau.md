@@ -32,6 +32,7 @@ Quelques exemples :
 - **Le soir, demain s’annonce beau** : juste assez en heures creuses cette nuit, le reste au soleil demain. « Du soleil est prévu : d’abord juste assez en heures creuses (de 23 h à 0 h 30), puis le soleil fera le reste (demain de 12 h à 13 h 45). »
 - **Le soir, demain s’annonce gris** : le ballon est rempli cette nuit, en heures creuses.
 - **Pas de panneaux** : tout en heures creuses, à l’heure où la maison tire le moins.
+- **Du soleil en trop, le ballon pas plein** : le ballon le garde tant qu’il coûte moins cher que la chauffe de nuit qu’il évite. Le soleil gardé coûte la revente perdue ; il est pris s’il reste sous le prix des heures creuses, moins 10 % pour les pertes du ballon (depuis la 1.0.1b6). Avec une revente à 0,13 € et des heures creuses à 0,16 €, il remplit le ballon ; avec une revente à 0,15 €, il ne chauffe au soleil que l’eau utile, et revend le reste.
 - **Les nuages arrivent** : la chauffe au soleil s’arrête si le soleil mesuré tombe bien sous la prévision. Le plan est refait avec moins de soleil, et l’eau manquante est rattrapée en heures creuses. « Les nuages sont arrivés : la chauffe au soleil s’arrête. »
 - **Il ne reste presque plus d’eau chaude avant la douche** : l’eau chaude passe d’abord, même en heures pleines. « Chauffe maintenant en heures pleines… »
 

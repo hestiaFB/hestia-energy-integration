@@ -1,6 +1,6 @@
 {
   "name": "hestia-energy-configuration",
-  "version": "1.0.1b5",
+  "version": "1.0.1b6",
   "private": true,
   "type": "module",
   "scripts": {

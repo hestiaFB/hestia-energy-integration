@@ -57,7 +57,7 @@ type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
  reserve:number|null;reserve_kwh:number|null;reserve_reelle?:number|null;reserve_reelle_kwh?:number|null;sonde?:boolean;force_jusqu_a?:string|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
  manque_a:string|null;courbe:[string,number,number,number|null,number,string|null][];soleil_prevu:string|null;plein_le:string|null;heures:number[];plages?:[number,number][];reserve_min:number;
- bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
+ bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean;force_kwh?:number;force_eur?:number}[];
  manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 /** « Votre contrat, bien utilisé » (engine/habits.py): the last 12 months. */
 type Device={nom:string;type:string;kwh:number;soleil:number;nuit:number;pleines:number;pleines_kwh:number;euros_an:number};
@@ -841,14 +841,14 @@ class HestiaEnergyCard extends LitElement {
     <i class="dot" style="--c:var(${SOURCE_C[r.source]??'--nw-home'})"></i>
     <div class="w"><b>${span(r.debut,r.fin)}</b><small>${SOURCE_W[r.source]??''}</small></div>
     <div class="v"><b>${eur(r.euros)} €</b><small>${kwh(r.kwh)} kWh</small></div></div>`)}</div>`):nothing;
-  const days=w.bilan.filter(d=>d.reel_kwh>=0.05||d.hestia_kwh>=0.05);
-  const real=days.reduce((s,d)=>s+d.reel_eur,0),hestia=days.reduce((s,d)=>s+d.hestia_eur,0),hc=days.reduce((s,d)=>s+d.hc_eur,0);
+  const days=w.bilan.filter(d=>d.reel_kwh>=0.05||d.hestia_kwh>=0.05||(d.force_kwh??0)>=0.05);
+  const real=days.reduce((s,d)=>s+d.reel_eur,0),hestia=days.reduce((s,d)=>s+d.hestia_eur,0),hc=days.reduce((s,d)=>s+d.hc_eur,0),forced=days.reduce((s,d)=>s+(d.force_eur??0),0);
   // Without Hestia (what was paid, or « off-peak only ») against the plan, day by day.
   const ref=w.simulation?real:hc,diff=ref-hestia,n=days.length,today=isoDay(new Date());
   const refW=w.simulation?'sans Hestia (ce que vous avez payé)':'en heures creuses seules';
   const review=n?this._enc(w.simulation?'Ce que le plan aurait coûté':'Ce que le plan a coûté',w.simulation
     ?html`Sans Hestia, votre chauffe-eau a coûté <b>${eur(real)} €</b>. Avec le plan, il aurait coûté <b>${eur(hestia)} €</b>${Math.abs(diff)>=0.005?html` : <b>${eur(Math.abs(diff))} € de ${diff>0?'moins':'plus'}</b>`:''}.`
-    :html`Avec le plan, <b>${eur(hestia)} €</b>. En heures creuses seules, la même eau aurait coûté <b>${eur(hc)} €</b>${Math.abs(diff)>=0.005?html` : <b>${eur(Math.abs(diff))} € de ${diff>0?'plus':'moins'}</b>`:''}.`,
+    :html`Avec le plan, <b>${eur(hestia)} €</b>. En heures creuses seules, la même eau aurait coûté <b>${eur(hc)} €</b>${Math.abs(diff)>=0.005?html` : <b>${eur(Math.abs(diff))} € de ${diff>0?'plus':'moins'}</b>`:''}.${forced>=0.005?html` Les marches forcées, comptées à part : <b>${eur(forced)} €</b>.`:''}`,
     html`${duo(days.map(d=>({n:d.jour===today?'aujourd’hui':dayMonth(d.jour),a:w.simulation?d.reel_eur:d.hc_eur,b:d.hestia_eur})))}
      <div class="nw-legend"><span><i style="--c:var(--nw-fg2)"></i>${refW}</span><span><i style="--c:var(--nw-water)"></i>avec le plan de Hestia</span></div>`,
     {aside:`sur ${n} jour${n>1?'s':''}`,foot:w.simulation?'Le plan est rejoué sur la même eau chaude, minute par minute : rien n’a été commandé.':nothing}):nothing;

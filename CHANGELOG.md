@@ -1,3 +1,14 @@
+## 1.0.1b6 — Le soleil gardé quand il coûte moins que la nuit, la marche forcée comptée à part
+
+### Améliorations
+
+- Chauffe-eau : le soleil en trop remplit le ballon dès qu’il coûte moins cher que la chauffe de nuit qu’il évite, même quand le ballon n’en a pas besoin tout de suite. Le soleil gardé coûte ce que vous auriez touché en le revendant ; il est pris tant qu’il reste sous le prix des heures creuses, moins 10 % pour les pertes du ballon. Avant, il fallait qu’il coûte moins du tiers des heures creuses : avec une revente à 0,13 € et des heures creuses à 0,16 €, Hestia revendait le soleil et rachetait la nuit. Quand la revente rapporte plus, Hestia revend toujours.
+
+### Corrections
+
+- Chauffe-eau : après « Chauffer maintenant », une fois le ballon plein, la page ne dit plus « Chauffe maintenant en heures pleines… sinon l’eau chaude manquerait » avec une chauffe de 0 kWh. Hestia laissait la prise allumée quelques minutes de plus, pour ne pas la faire claquer : elle ne le fait plus quand le ballon est plein, et ces quelques minutes ne passent jamais pour une urgence.
+- « Ce que le plan a coûté » ne compte plus la marche forcée : c’est votre choix, pas celui du plan. Elle est montrée à part, sur la carte et dans les derniers jours de la page Chauffe-eau. Avant, une marche forcée en heures pleines rendait le plan plus cher que les heures creuses seules. Les jours d’avant cette version gardent l’ancien calcul.
+
 ## 1.0.1b5 — Le chauffe-eau prêt avant chaque plage, votre vrai ballon en Simulation
 
 ### Nouveautés
