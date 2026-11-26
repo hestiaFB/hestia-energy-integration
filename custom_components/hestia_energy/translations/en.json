@@ -81,6 +81,12 @@
           "blanc": "White",
           "rouge": "Red"
         }
+      },
+      "chauffe_eau_reserve": {
+        "name": "Water heater: reserve"
+      },
+      "chauffe_eau_prochaine": {
+        "name": "Water heater: next heating"
       }
     },
     "binary_sensor": {
@@ -95,6 +101,25 @@
       },
       "donnee_douteuse": {
         "name": "Doubtful data"
+      },
+      "chauffe_eau": {
+        "name": "Water heater: heat"
+      }
+    },
+    "select": {
+      "chauffe_eau_mode": {
+        "name": "Water heater: mode",
+        "state": {
+          "simulation": "Simulation",
+          "automatique": "Automatic",
+          "heures_creuses": "Off-peak hours only",
+          "vacances": "Away"
+        }
+      }
+    },
+    "button": {
+      "chauffe_eau_boost": {
+        "name": "Water heater: heat now"
       }
     }
   },

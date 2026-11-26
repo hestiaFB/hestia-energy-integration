@@ -81,6 +81,12 @@
           "blanc": "Blanc",
           "rouge": "Rouge"
         }
+      },
+      "chauffe_eau_reserve": {
+        "name": "Chauffe-eau : réserve"
+      },
+      "chauffe_eau_prochaine": {
+        "name": "Chauffe-eau : prochaine chauffe"
       }
     },
     "binary_sensor": {
@@ -95,6 +101,25 @@
       },
       "donnee_douteuse": {
         "name": "Donnée douteuse"
+      },
+      "chauffe_eau": {
+        "name": "Chauffe-eau : chauffer"
+      }
+    },
+    "select": {
+      "chauffe_eau_mode": {
+        "name": "Chauffe-eau : mode",
+        "state": {
+          "simulation": "Simulation",
+          "automatique": "Automatique",
+          "heures_creuses": "Heures creuses seules",
+          "vacances": "Vacances"
+        }
+      }
+    },
+    "button": {
+      "chauffe_eau_boost": {
+        "name": "Chauffe-eau : chauffer maintenant"
       }
     }
   },

@@ -10,12 +10,13 @@ Une seule carte, **Hestia Énergie**, en plusieurs formats. Chacun répond à un
 | **Tuile** | En ce moment : une phrase, un chiffre. « La maison consomme 1,3 kW. » Quand il n’y a rien à faire, le meilleur conseil. |
 | **Conseils** | Ce qui ferait économiser, en euros par an, du plus rentable au moins rentable. |
 | **Soleil** | Ce que les panneaux ont produit aujourd’hui, groupe par groupe. |
-| **Chauffage** | Ce qu’a coûté la saison, depuis le 1er octobre : radiateurs et poêle. |
+| **Chauffage** | Ce qu’a coûté la saison, depuis le 1er octobre : radiateurs et poêle. Avec Hestia Chauffage 1.1 ou plus récente : le coût qu’elle compte, aujourd’hui, hier et ce mois-ci (un seul coût du chauffage). |
 | **Veille** | Ce qui tourne la nuit, sur les 30 dernières nuits, et ce que ça coûte par an. |
 | **Eau** | Les litres et les euros du mois, jour par jour. |
 | **Appareils** | Ce que chaque appareil a consommé aujourd’hui, en kWh et en euros. |
 | **Pointe** | La plus forte puissance prise aujourd’hui, face à votre abonnement. |
 | **Contrat** | Vos heures creuses et vos prix ce mois-ci, et ce qu’aurait coûté l’option Base. |
+| **Chauffe-eau** | Le chauffe-eau piloté (1.0.0b11) : sa réserve, son plan des prochaines heures, ses chauffes et ce qu’elles ont coûté. Voir [le chauffe-eau](chauffe-eau.md). |
 
 ## La carte complète
 
@@ -53,7 +54,7 @@ type: custom:hestia-energy-card
 card: tuile
 ```
 
-`card` vaut `complete`, `tuile`, `conseils`, `soleil`, `chauffage`, `veille`, `eau`, `appareils`, `pointe` ou `contrat`. `name` (facultatif) change le titre.
+`card` vaut `complete`, `tuile`, `conseils`, `soleil`, `chauffage`, `veille`, `eau`, `appareils`, `pointe`, `contrat` ou `chauffe_eau`. `name` (facultatif) change le titre.
 
 ## Les couleurs
 

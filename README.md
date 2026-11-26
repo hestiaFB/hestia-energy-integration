@@ -15,7 +15,7 @@
 
 Elle donne le résultat à **sa carte**, fournie avec elle, et à vos automatisations.
 
-> **Préversion (bêta) 1.0.0b10.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
+> **Préversion (bêta) 1.0.0b11.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
 
 ![Hestia Énergie — l’électricité de la maison, expliquée en euros : la carte complète avec son horloge de la journée, la frise du lave-linge, entre « En ce moment » et « Ce mois-ci »](docs/images/hestia-energy-banner.png)
 
@@ -86,7 +86,7 @@ Les tarifs réglementés d’EDF (Tarif Bleu) sont dans l’intégration, depuis
 
 ## La carte
 
-Une seule carte, **Hestia Énergie**, en dix formats : la **complète**, la **tuile**, les **conseils**, et une carte de détail par question (soleil, chauffage, veille, eau, appareils, pointe, contrat). Chaque carte répond d’abord en une phrase, avec son chiffre en gras, puis dit pourquoi : « Quand tout dort, la maison consomme 190 W. Cela fait environ 330 € par an. »
+Une seule carte, **Hestia Énergie**, en onze formats : la **complète**, la **tuile**, les **conseils**, et une carte de détail par question (soleil, chauffage, veille, eau, appareils, pointe, contrat, chauffe-eau). Chaque carte répond d’abord en une phrase, avec son chiffre en gras, puis dit pourquoi : « Quand tout dort, la maison consomme 190 W. Cela fait environ 330 € par an. »
 
 Dans la carte complète, **Pour économiser** range les conseils du plus rentable au moins rentable. Le chauffe-eau et chaque machine y ont leur frise de la journée : les heures creuses, le soleil et les heures pleines, l’icône de l’appareil à ses départs habituels, et l’heure à viser. [La carte en détail : formats, frise, couleurs, YAML](docs/cartes.md).
 
@@ -97,6 +97,10 @@ Dans la carte complète, **Pour économiser** range les conseils du plus rentabl
 Les entités disent ce que dit la carte : coût du jour et du mois, prix du moment, heures creuses, puissance de la maison, pointe proche du disjoncteur, veille de nuit, part du soleil, soleil en trop, conseil et sa couleur, couleur Tempo. Une entité n’est créée que si votre équipement permet de la remplir.
 
 Par exemple : lancer le chauffe-eau quand **Soleil en trop** passe à oui, ou couper un radiateur quand **Pointe proche du disjoncteur** s’allume. [Toutes les entités](docs/entites.md).
+
+## Le chauffe-eau piloté
+
+Nouveau dans la 1.0.0b11 : Hestia fait le plan de chauffe d’un chauffe-eau sur une prise connectée. Au soleil quand il y en aura, en heures creuses sinon, selon le temps de demain, sans jamais manquer d’eau chaude. Elle ne le commande pas elle-même : un capteur dit quand chauffer, et votre automatisation (un blueprint est fourni) allume la prise. Il démarre en **Simulation** : rien n’est commandé tant que vous ne passez pas en Automatique. [Le chauffe-eau en détail](docs/chauffe-eau.md).
 
 Hestia Énergie reconnaît seule HA Linky, linkytic, RTE Tempo, OpenDTU, Comwatt, Versatile Thermostat, Suivi Stock Pellet et Hestia Weather. Elle les lit, ne les commande jamais, et chacune se coupe d’un interrupteur. [Les extensions](docs/extensions.md).
 
@@ -113,20 +117,22 @@ Les valeurs des entités (Conseil, Période…) restent en français, pour que v
 | Page | Ce qu’elle explique |
 | --- | --- |
 | [L’installation pas à pas](docs/installation.md) | Les six étapes et ce que vous devez voir à chacune, quand les chiffres arrivent, ce qu’Énergie fait selon votre équipement |
-| [La carte](docs/cartes.md) | Les dix formats, la carte complète de haut en bas, la frise d’un appareil, les couleurs, le YAML |
+| [La carte](docs/cartes.md) | les onze formats, la carte complète de haut en bas, la frise d’un appareil, les couleurs, le YAML |
 | [L’onglet Énergie](docs/panneau.md) | Les pages du panneau Hestia-FB et les notifications |
 | [Le contrat et les prix](docs/contrat.md) | Le Tarif Bleu intégré, une autre offre, les heures creuses, la revente |
 | [Les extensions](docs/extensions.md) | Ce que chaque intégration reconnue apporte |
+| [Le chauffe-eau piloté](docs/chauffe-eau.md) | Le plan de chauffe, les modes, le blueprint, les entités |
 | [Les entités](docs/entites.md) | Chaque entité et ce qu’elle dit, pour vos automatisations |
 | [Pour les développeurs](docs/technique.md) | Les tests, le moteur, la table des tarifs |
 | [Le plan d’optimisation](docs/PLAN-OPTIMISATION.md) | Les mesures sur un vrai Home Assistant et ce qui a été allégé |
 
 ## Limites
 
-Hestia Énergie conseille. Elle n’allume, n’éteint et ne règle rien.
+Hestia Énergie conseille. Elle n’allume, n’éteint et ne règle rien : même pour le chauffe-eau, c’est votre automatisation qui commande la prise.
 
 Pas encore vérifié sur une vraie maison :
 
+- **Le chauffe-eau piloté** (1.0.0b11) : il démarre en Simulation, pour regarder ses plans avant de lui confier la prise.
 - **Tempo** : les couleurs et leurs prix sont comptés, mais aucune maison en Tempo n’a encore servi d’essai.
 - **Gaz, bois, fioul** : pas encore comptés. Le poêle à granulés l’est, avec Suivi Stock Pellet.
 - **Pompe à chaleur** : sa consommation est comptée avec le reste de l’électricité, mais aucune maison équipée n’a encore servi d’essai.

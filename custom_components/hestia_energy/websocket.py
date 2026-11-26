@@ -12,14 +12,15 @@ from homeassistant.exceptions import HomeAssistantError
 from . import hub_view
 from .const import DOMAIN
 from .engine import hub, report
+from .engine import water_heater as wh
 
-RUBRIQUES = ("soleil", "chauffage", "eau", "contrat", "appareils", "veille", "pointe")
+RUBRIQUES = ("soleil", "chauffage", "eau", "contrat", "appareils", "veille", "pointe", "chauffe_eau")
 VIEW_VERSION = 1
 # What the cards read (card/src/card.ts): the reports' findings, the sources, the extensions and the hub's figures stay
 # out of their view (33 kB → about 10 kB; audit of 9 Nov. 2026).
 CARD_KEYS = ("pret", "palier", "equipement", "direct", "jour", "hier", "mois", "mois_an_dernier", "projection", "jusqu_ici",
              "dernier_jour", "pistes", "veille", "veille_historique", "heures_creuses", "contrat", "heures", "eau",
-             "chauffage", "panneaux", "soleil_jour", "appareils_jour", "pointe", "usage")
+             "chauffage", "panneaux", "soleil_jour", "appareils_jour", "pointe", "usage", "chauffe_eau", "cout_chauffage")
 
 
 def _coordinator(hass):
@@ -116,8 +117,10 @@ def ws_detail(hass, connection, msg):
         out = {"fuite": live.get("fuite"), "jour": "bientot"}
     elif rubrique == "appareils":
         out = {"en_marche": live.get("en_marche"), "repartition": "bientot"}
+    elif rubrique == "chauffe_eau":
+        out = {"chauffe_eau": d.get("chauffe_eau")}
     else:
-        out = {"chauffage": d.get("chauffage")}
+        out = {"chauffage": d.get("chauffage"), "cout_chauffage": d.get("cout_chauffage")}
     connection.send_result(msg["id"], {"rubrique": rubrique, **out})
 
 
@@ -191,10 +194,23 @@ SETTINGS = vol.Schema({
     **{vol.Optional(k): bool for k in ("notify_day", "notify_week", "notify_month", "notify_leak", "notify_forgot")},
     vol.Optional("groups"): {str: vol.In(hub.GROUPS)},
     vol.Optional("extensions"): {vol.In(_EXTENSIONS): bool},
+    # The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md): every key optional, None the default.
+    vol.Optional("chauffe_eau"): vol.Schema({
+        vol.Optional("mode"): vol.In(wh.MODES),
+        vol.Optional("appareil"): vol.Any(None, vol.All(str, vol.Length(min=1, max=255))),
+        vol.Optional("prise"): vol.Any(None, vol.All(str, vol.Match(r"^(switch|input_boolean|light)\.[a-z0-9_]+$"))),
+        vol.Optional("sonde"): vol.Any(None, vol.All(str, vol.Match(r"^(sensor|water_heater)\.[a-z0-9_]+$"))),
+        vol.Optional("litres"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=10, max=1000))),
+        vol.Optional("puissance_w"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=300, max=12000))),
+        vol.Optional("heures"): vol.All([vol.All(str, vol.Match(r"^\d{1,2}[:h]\d{2}$"))], vol.Length(max=6)),
+        vol.Optional("reserve_min"): vol.All(vol.Coerce(float), vol.Range(min=0, max=0.8)),
+        vol.Optional("demarrages"): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
+        vol.Optional("consigne"): vol.All(vol.Coerce(float), vol.Range(min=40, max=85)),
+    }),
 })
 KEYS = ("kva", "margin", "export_price", "option", "bag_price", "notify_service", "notify_hour", "offpeak", "offpeak_weekend", "offer", "price_hp",
         "price_hc", "price_base", "subscription", "water_price", "stove_fuel", "notify_day", "notify_week", "notify_month",
-        "notify_leak", "notify_forgot", "groups", "extensions", "weather_place")
+        "notify_leak", "notify_forgot", "groups", "extensions", "weather_place", "chauffe_eau")
 
 
 # The contract's settings an automation may change (issue 18: an offer Hestia does not know, its hours and prices

@@ -1,4 +1,5 @@
-"""Hestia Energy: reads Home Assistant's Energy page and its statistics; commands nothing by default."""
+"""Hestia Energy: reads Home Assistant's Energy page and its statistics; commands nothing (the water heater is driven
+by the household's automation following « Chauffe-eau : chauffer »)."""
 from homeassistant.const import Platform
 from homeassistant.helpers import config_validation as cv
 
@@ -9,7 +10,7 @@ from .panel import CARD_URL, async_setup_panel
 from .socle import async_remove_card
 from .websocket import async_setup_services, async_setup_websocket
 
-PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR]
+PLATFORMS = [Platform.SENSOR, Platform.BINARY_SENSOR, Platform.SELECT, Platform.BUTTON]
 CONFIG_SCHEMA = cv.config_entry_only_config_schema(DOMAIN)
 
 

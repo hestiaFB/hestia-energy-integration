@@ -1,4 +1,5 @@
-"""The binary sensors of INTERFACE.md § 1.2: off-peak hours, surplus, peak near the breaker, doubtful data."""
+"""The binary sensors of INTERFACE.md § 1.2: off-peak hours, surplus, peak near the breaker, doubtful data, and since
+1.0.0b11 « Chauffe-eau : chauffer » (docs/chauffe-eau.md), which the household's automation follows."""
 from __future__ import annotations
 
 from collections.abc import Callable
@@ -35,6 +36,17 @@ def _doubtful(d: dict) -> list[dict]:
     return list(d.get("a_regler") or []) + live
 
 
+def _heater(d: dict) -> dict:
+    return d.get("chauffe_eau") or {}
+
+
+def _heater_attributes(d: dict) -> dict:
+    h = _heater(d)
+    return {"mode": h.get("mode"), "simulation": h.get("simulation"), "raison": h.get("raison"), "phrase": h.get("phrase"),
+            "jusqu_a": h.get("jusqu_a"), "prochaine_chauffe": h.get("prochaine_chauffe"), "reserve": h.get("reserve"),
+            "plan": h.get("plan"), "kwh_prevus": h.get("kwh_prevus"), "cout_prevu": h.get("cout_prevu")}
+
+
 BINARIES = (
     EnergyBinaryDescription(
         key="heures_creuses", translation_key="heures_creuses",
@@ -54,6 +66,11 @@ BINARIES = (
     EnergyBinaryDescription(
         key="donnee_douteuse", translation_key="donnee_douteuse", value=lambda d: bool(_doubtful(d)),
         attributes=lambda d: {"quoi": _doubtful(d)[:20], "nombre": len(_doubtful(d))}),
+    # On in « Simulation » too (its history shows what Hestia would have done); the blueprint follows it only outside it.
+    EnergyBinaryDescription(
+        key="chauffe_eau", translation_key="chauffe_eau", icon="mdi:water-boiler",
+        value=lambda d: None if not _heater(d) else bool(_heater(d).get("chauffer")),
+        attributes=_heater_attributes, exists=lambda d: bool(d.get("chauffe_eau_trouve"))),
 )
 
 

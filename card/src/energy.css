@@ -305,3 +305,14 @@ button.piste:focus-visible { outline:2px solid var(--nw-accent); outline-offset:
 .smonths .sm i { align-self:end; border-radius:4px 4px 2px 2px; background:var(--nw-sun); }
 .smonths .sm small { font-size:var(--nw-fs-small); color:var(--nw-fg2); }
 .u-kva { margin-top:auto; padding-top:6px; }
+/* The water heater's plan (1.0.0b11): reserve, sun forecast, heatings by source, the price of each half hour. */
+.whc { display:block; width:100%; height:auto; }
+.whc .gl { stroke:var(--nw-line-soft); stroke-width:1; }
+.whc .tk { font-size:10px; fill:var(--nw-fg2); }
+.whc .sun { fill:color-mix(in oklab, var(--nw-sun) 40%, transparent); }
+.whc .res { fill:none; stroke:var(--nw-water); stroke-width:2.5; stroke-linejoin:round; }
+.whc .min { stroke:var(--nw-act); stroke-width:1; stroke-dasharray:3 4; }
+.whc .hw { stroke:var(--nw-water); stroke-opacity:.35; }
+.whc .hwl { font-size:9.5px; font-weight:600; fill:color-mix(in oklab, var(--nw-water) 70%, var(--nw-fg)); }
+.whc .pb { fill-opacity:.5; }
+.hb.list .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--c); margin-right:6px; vertical-align:1px; }

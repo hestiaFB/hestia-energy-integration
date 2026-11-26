@@ -1,0 +1,89 @@
+blueprint:
+  name: Piloter le chauffe-eau avec Hestia Énergie
+  description: >-
+    La prise du chauffe-eau suit « Chauffe-eau : chauffer » de Hestia Énergie.
+    Rien n'est commandé tant que le mode du chauffe-eau est sur « Simulation » :
+    passez-le sur « Automatique » quand le plan vous convient.
+    Si vous activez le repli, la prise suit vos heures creuses quand Hestia Énergie
+    ne répond plus depuis 15 minutes.
+  domain: automation
+  source_url: https://github.com/hestiaFB/hestia-energy-integration/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml
+  input:
+    prise:
+      name: Prise ou contacteur du chauffe-eau
+      selector:
+        entity:
+          filter:
+            - domain: [switch, input_boolean]
+    pilote:
+      name: Capteur de Hestia Énergie
+      default: binary_sensor.hestia_energy_chauffe_eau
+      selector:
+        entity:
+          filter:
+            - domain: binary_sensor
+    mode:
+      name: Mode du chauffe-eau
+      default: select.hestia_energy_chauffe_eau_mode
+      selector:
+        entity:
+          filter:
+            - domain: select
+    repli:
+      name: Repli en heures creuses si Hestia Énergie ne répond plus
+      default: false
+      selector:
+        boolean: {}
+    debut_hc:
+      name: Début des heures creuses (pour le repli)
+      default: "22:00:00"
+      selector:
+        time: {}
+    fin_hc:
+      name: Fin des heures creuses (pour le repli)
+      default: "06:00:00"
+      selector:
+        time: {}
+
+mode: restart
+
+triggers:
+  - trigger: state
+    entity_id: !input pilote
+  - trigger: state
+    entity_id: !input mode
+  - trigger: homeassistant
+    event: start
+  # Every 5 minutes: the plug put back if someone changed it by hand, and the off-peak hours of the fallback.
+  - trigger: time_pattern
+    minutes: "/5"
+
+variables:
+  pilote_entite: !input pilote
+  mode_entite: !input mode
+  prise_entite: !input prise
+  repli: !input repli
+  debut_hc: !input debut_hc
+  fin_hc: !input fin_hc
+  mode_actuel: "{{ states(mode_entite) }}"
+  absent: >-
+    {{ states(pilote_entite) in ['unavailable', 'unknown']
+       and mode_actuel in ['unavailable', 'unknown']
+       and (now() - states[pilote_entite].last_changed).total_seconds() >= 900
+       if states[pilote_entite] is not none else false }}
+  en_hc: >-
+    {% set h = now().strftime('%H:%M:%S') %}
+    {{ (debut_hc <= h or h < fin_hc) if debut_hc > fin_hc else (debut_hc <= h < fin_hc) }}
+  voulu: >-
+    {% if mode_actuel in ['automatique', 'heures_creuses', 'vacances'] and states(pilote_entite) in ['on', 'off'] %}{{ states(pilote_entite) }}
+    {%- elif repli and absent %}{{ 'on' if en_hc else 'off' }}
+    {%- else %}rien{% endif %}
+
+conditions:
+  - condition: template
+    value_template: "{{ voulu in ['on', 'off'] and states(prise_entite) != voulu }}"
+
+actions:
+  - action: "homeassistant.turn_{{ voulu }}"
+    target:
+      entity_id: "{{ prise_entite }}"

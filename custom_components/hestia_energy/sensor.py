@@ -7,6 +7,7 @@ from __future__ import annotations
 
 from collections.abc import Callable
 from dataclasses import dataclass
+from datetime import datetime
 
 from homeassistant.components.sensor import SensorDeviceClass, SensorEntity, SensorEntityDescription, SensorStateClass
 from homeassistant.const import UnitOfPower
@@ -31,6 +32,10 @@ def _banner(d: dict) -> dict:
 
 def _r(value, n=2):
     return None if value is None else round(value, n)
+
+
+def _when(iso: str | None):
+    return None if not iso else datetime.fromisoformat(iso)
 
 
 def _max_w(d: dict):
@@ -92,6 +97,18 @@ SENSORS = (
         key="couleur_tempo_demain", translation_key="couleur_tempo_demain", device_class=SensorDeviceClass.ENUM,
         options=["bleu", "blanc", "rouge"], value=lambda d: _direct(d).get("couleur_demain"),
         exists=lambda d: bool((d.get("extensions") or {}).get("tempo_tomorrow"))),
+    # The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md).
+    EnergySensorDescription(
+        key="chauffe_eau_reserve", translation_key="chauffe_eau_reserve", native_unit_of_measurement="%",
+        state_class=SensorStateClass.MEASUREMENT, icon="mdi:water-percent",
+        value=lambda d: (d.get("chauffe_eau") or {}).get("reserve"),
+        attributes=lambda d: {k: (d.get("chauffe_eau") or {}).get(k) for k in ("reserve_kwh", "capacite_kwh", "besoin_kwh", "plein_le")},
+        exists=lambda d: bool(d.get("chauffe_eau_trouve"))),
+    EnergySensorDescription(
+        key="chauffe_eau_prochaine", translation_key="chauffe_eau_prochaine", device_class=SensorDeviceClass.TIMESTAMP,
+        value=lambda d: _when((d.get("chauffe_eau") or {}).get("prochaine_chauffe")),
+        attributes=lambda d: {"plan": (d.get("chauffe_eau") or {}).get("plan")},
+        exists=lambda d: bool(d.get("chauffe_eau_trouve"))),
 )
 
 

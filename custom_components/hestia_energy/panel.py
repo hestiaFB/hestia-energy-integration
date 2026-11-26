@@ -18,10 +18,21 @@ CARD_FILE = "hestia-energy-card.js"
 CARD_URL = f"{ASSETS}/{CARD_FILE}"
 # The tab's menu (socle 1.20): [path, label, icon]. Icons from the socle's hubIcon(); its own energy icons come with the tab.
 # The page Contrat is gone: its settings are in Réglages (INTERFACE.md § 5, H1). Appareils is hidden without devices.
+# Chauffe-eau (1.0.0b11) only for a home with a water heater (or its plug and power typed in the settings).
 MENU = [["", "Vue d’ensemble", "home"], ["sources", "Sources", "entities"], ["appareils", "Appareils", "light"],
-        ["reglages", "Réglages", "settings"], ["extensions", "Extensions", "extensions"],
+        ["chauffe-eau", "Chauffe-eau", "temperature"], ["reglages", "Réglages", "settings"], ["extensions", "Extensions", "extensions"],
         ["bilan", "Bilan", "review"], ["a-propos", "À propos", "info"]]
-MENU_NO_DEVICES = [item for item in MENU if item[0] != "appareils"]
+MENU_NO_DEVICES = [item for item in MENU if item[0] not in ("appareils", "chauffe-eau")]
+
+
+def menu_for(coordinator) -> list:
+    """The tab's menu for this home: Appareils with devices in the Energy page, Chauffe-eau with a water heater."""
+    hidden = set()
+    if not coordinator.page.devices:
+        hidden.add("appareils")
+    if not coordinator.heater.found():
+        hidden.add("chauffe-eau")
+    return [item for item in MENU if item[0] not in hidden]
 
 
 class _LiveCardView(HomeAssistantView):
@@ -69,7 +80,7 @@ async def energy_status(hass, lang=None):
     # Appareils only when the Energy page has devices (H1): the socle reads the menu after asking the status.
     brick = hass.data.get(SOCLE_KEY, {}).get("bricks", {}).get(DOMAIN)
     if brick is not None and coordinator is not None and coordinator.page is not None:
-        brick["menu"] = MENU if coordinator.page.devices else MENU_NO_DEVICES
+        brick["menu"] = menu_for(coordinator)
     if not data.get("pret"):
         return {"level": "unknown", "summary": "Lecture de la page Énergie en cours.", "details": [], "links": []}
     if not (data.get("equipement") or {}).get("facture"):

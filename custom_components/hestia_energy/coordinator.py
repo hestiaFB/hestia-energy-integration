@@ -23,7 +23,9 @@ from homeassistant.helpers.storage import Store
 from homeassistant.util import dt as dt_util
 
 from . import hub_view, reader
+from .chauffe_eau import WaterHeater
 from .const import DOMAIN
+from .engine import water_heater as engine_heater
 from .engine import advice, anomaly, baseline, cards, daily, habits, health, heating, hub, solar, home as engine_home, live, phrases, report, sources, stats, tariff
 from .engine.rows import Rows, merge as merge_rows
 
@@ -59,6 +61,25 @@ DEFAULTS = {"kva": None, "option": None, "margin": 0.1, "watched": {"seche_servi
 
 def _weather_updated() -> None:
     """Hestia Weather recomputed the place: nothing to do here (the cold is read at the hourly refresh)."""
+
+
+def heating_month_cost(hass, today) -> dict | None:
+    """Today, yesterday and the month from the 1st, from Hestia Heating's `cout_chauffage` (reader.heating_cost). A
+    month sum is None for a part when a day of it has no known price; `jours` says how many days Hestia Heating knew."""
+    now = reader.heating_cost(hass)
+    if now is None:
+        return None
+    days = [now]
+    for back in range(1, today.day):
+        found = reader.heating_cost(hass, today - timedelta(days=back))
+        if found is not None:
+            days.append(found)
+    month: dict = {"jours": len(days), "du": today.replace(day=1).isoformat()}
+    for key in ("electrique_kwh", "electrique_eur", "granules_kg", "granules_eur", "chauffage_eur", "gagne_eur"):
+        values = [d[key] for d in days]
+        month[key] = None if any(v is None for v in values) else round(sum(values), 2)
+    yesterday = reader.heating_cost(hass, today - timedelta(days=1))
+    return {"aujourdhui": now, "hier": yesterday, "mois": month, "par": "Hestia Chauffage"}
 
 
 class EnergyCoordinator:
@@ -117,6 +138,8 @@ class EnergyCoordinator:
         self._failed = False
         # Each past day Hestia Weather could not give, with the day it was asked: asked again the next day only.
         self._cold_asked: dict[date, date] = {}
+        # The water heater driven by Hestia (1.0.0b11): its plan, its reserve, its « Chauffe-eau : chauffer ».
+        self.heater = WaterHeater(self)
 
     # --- life ---------------------------------------------------------------------------------------------------
 
@@ -135,6 +158,9 @@ class EnergyCoordinator:
         self.extras = reader.detect(self.hass)
         self._switch_off()
         self.level = sources.equipment(self.page)
+        await self.heater.async_load()
+        # Its entities are made only for a home with a water heater (or a plug and a power typed in the settings).
+        self.data["chauffe_eau_trouve"] = self.heater.found()
         self.data["source"] = self._source()
         periods = {m.period for m in self.page.imports}
         self.extras["prevision"] = any(m.forecasts for m in self.page.solar)
@@ -185,6 +211,8 @@ class EnergyCoordinator:
             self._weather_stop = None
         self._unsubs.clear()
         self._listeners.clear()
+        if self.heater.tank.kwh is not None:
+            await self.heater.async_save()
 
     def add_stop_listener(self, stopped):
         """Called once when the brick stops (unloaded, reloaded): the cards follow the new one."""
@@ -278,8 +306,17 @@ class EnergyCoordinator:
     async def async_save_settings(self, changes: dict, wait: bool = True) -> None:
         """Kept at once; the reports follow. From the hub (`wait=False`) the answer does not wait for them: a refresh
         may already be reading a year of statistics."""
+        found = self.heater.found()
+        if isinstance(changes.get("chauffe_eau"), dict):
+            # The water heater's settings: what is sent changes, the rest stays (the select sends its mode alone).
+            changes = {**changes, "chauffe_eau": {**(self.settings.get("chauffe_eau") or {}), **changes["chauffe_eau"]}}
         self.settings.update(changes)
         await self.store.async_save(self.settings)
+        if "chauffe_eau" in changes:
+            self.heater.replan()
+            if self.heater.found() and not found and not self.data.get("chauffe_eau_trouve"):
+                # A water heater chosen for the first time: its entities come with the home loaded again.
+                self.hass.config_entries.async_schedule_reload(self.entry.entry_id)
         if wait:
             await self.async_refresh(full=False)
         else:
@@ -393,6 +430,9 @@ class EnergyCoordinator:
             return
         self._follow_live()
         self.data.update(await self.hass.async_add_executor_job(self._reports, now, prices, export_price))
+        await self.heater.async_forecast(now)
+        self.heater.replan()
+        self._read_heating_cost(now)
         self.data["pret"] = True
 
     async def _fetch_colours(self, now: datetime) -> None:
@@ -615,6 +655,9 @@ class EnergyCoordinator:
         to_mend = hub_view.pending(self, findings)
         # What a kWh of sun kept saves: the daytime price (peak hours, or Base).
         avoided = self._price_of("hp" if self.contract.option == tariff.HPHC else "base", now) if self.contract.option != tariff.TEMPO else None
+        # The water heater: what is learned from the statistics (plain Python, here in the worker thread).
+        self.heater.learn(now)
+        driven = self.heater.found() and self.heater.mode != engine_heater.SIMULATION
         channels = {c: self.rows[c] for c in self.extras.get("channels") or [] if self.rows.get(c)}
         return {
             "palier": self.level.level if self.level else 0, "equipement": _level(self.level),
@@ -661,7 +704,9 @@ class EnergyCoordinator:
                 daily.advices(home, self.contract, self.table, now, self.cold, self.weather_cold == "oui", price,
                               report.month(home, self.contract, self.table, local.year - 1, local.month),
                               report.projection(month, min(now, known) if known else now)),
-                habits.advices(self._usage, self.contract, bool(self.level and self.level.sun))),
+                # Driven by Hestia, the water heater has no « Programmez-le à… » any more: the plan does it.
+                [a for a in habits.advices(self._usage, self.contract, bool(self.level and self.level.sun))
+                 if not (driven and a["id"] == "chauffe_eau_heures")]),
             "a_savoir": self._know(today, yesterday, month, rise, price, self._unusual(home, local), panels, bool(to_mend)),
             "mis_a_jour": now.isoformat(),
         }
@@ -794,6 +839,8 @@ class EnergyCoordinator:
             entities |= set(meter.power.entities)
         entities |= {e for e in (self.extras.get("period"), self.extras.get("tempo_today"), self.extras.get("tempo_tomorrow"),
                                  self.extras.get("inverter")) if e}
+        heater = self.heater.settings
+        entities |= {e for e in (heater.get("prise"), heater.get("sonde")) if e}
         if self._live_unsub:
             self._live_unsub()
         self._live_unsub = async_track_state_change_event(self.hass, sorted(entities), self._state_changed) if entities else None
@@ -834,6 +881,13 @@ class EnergyCoordinator:
         if reading is None:
             return None
         return live.Candidate("Onduleurs (OpenDTU)", [(reading, 1)], local=self.locality.get(reading.entity_id))
+
+    def _read_heating_cost(self, now: datetime) -> None:
+        """The heating's cost as Hestia Heating counts it (1.0.0b11, « un seul coût » : shown as it is, never counted a
+        second time here): today so far, yesterday, and the month from the 1st. Read from its memory, every 10 minutes
+        (it counts today's every 10 minutes). None without Hestia Heating 1.1 or later."""
+        self._heating_cost_at = now
+        self.data["cout_chauffage"] = heating_month_cost(self.hass, now.astimezone(self.tz).date())
 
     @callback
     def _update_live(self) -> None:
@@ -885,14 +939,17 @@ class EnergyCoordinator:
         watched = {r.name: self.settings["watched"].get(r.kind) or self.run_limits.get(r.name) for r in running
                    if self.settings["watched"].get(r.kind) or self.run_limits.get(r.name)}
         tempo = self._tempo(now)
+        driven = self.heater.found() and self.heater.mode != engine_heater.SIMULATION
+        # Driven by Hestia, the water heater on the grid is its own plan, not a habit to change: the banner leaves it out.
+        advised = [r for r in running if r.kind != "chauffe_eau"] if driven else running
         situation = advice.Situation(
             now=now, tz=self.tz, period=period, next_change=change,
             offpeak_end=change[0] if change and period == "hc" else None,
-            bought_w=bought, sent_w=exported, sun_w=produced, subscribed_w=kva * 1000 if kva else None, running=running,
+            bought_w=bought, sent_w=exported, sun_w=produced, subscribed_w=kva * 1000 if kva else None, running=advised,
             export_price=self.contract.export_price if self.contract else None,
             offpeak_price=self._price_of("hc", now) if self.contract and self.contract.option == tariff.HPHC else None,
             water_leak_min=self.flow.minutes(now), water_litres_per_day=self.flow.litres_per_day if self.flow.since else None,
-            watched=watched, heater_gain=habits.heater_gain(self.data.get("usage")),
+            watched=watched, heater_gain=None if driven else habits.heater_gain(self.data.get("usage")),
             **tempo["advice"])
         banner = self.steady.update(advice.choose(situation), now)
         self._alert(banner)
@@ -915,6 +972,12 @@ class EnergyCoordinator:
             "chauffage": None if heat_now is None else heat_now.as_dict(price),
             "bandeau": banner, "sources": {k: _verdict(v) for k, v in verdicts.items()}, "a": now.isoformat(),
         }
+        if now - getattr(self, "_heating_cost_at", now - timedelta(hours=1)) >= timedelta(minutes=10):
+            self._read_heating_cost(now)
+        try:
+            self.data["chauffe_eau"] = self.heater.update(now)
+        except Exception:  # noqa: BLE001 - the water heater's trouble never stops the rest of the brick
+            _LOGGER.exception("Hestia Énergie : plan du chauffe-eau non refait")
         self._notify()
 
     def _tempo(self, now: datetime) -> dict:

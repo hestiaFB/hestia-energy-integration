@@ -1,3 +1,27 @@
+## 1.0.0b11 — Le chauffe-eau piloté
+
+### Nouveautés
+
+- Hestia Énergie sait piloter un chauffe-eau électrique branché sur une prise connectée. Toutes les 5 minutes, elle refait le plan des 36 prochaines heures : au soleil quand les panneaux en donneront, en heures creuses sinon, jamais quand la maison tire déjà beaucoup, et toujours assez d’eau chaude aux heures des douches. Le soir, elle regarde le temps de demain : beau, elle chauffe juste assez la nuit et garde le reste pour le soleil ; gris, elle remplit le ballon la nuit. Si les nuages arrivent en journée, la chauffe au soleil s’arrête et le manque est rattrapé plus tard, au moins cher.
+- Elle ne commande jamais le chauffe-eau elle-même : un nouveau capteur, « Chauffe-eau : chauffer », dit quand chauffer, et c’est votre automatisation qui allume la prise. Un blueprint est fourni (« Piloter le chauffe-eau avec Hestia Énergie »).
+- **Mode Simulation par défaut** : Hestia montre ce qu’elle ferait, et le blueprint ne touche à rien. On passe en Automatique quand on veut, dans l’onglet Énergie ou par l’entité « Chauffe-eau : mode ». Aussi : Heures creuses (comme un contacteur jour/nuit) et Vacances.
+- La réserve d’eau chaude estimée (ou mesurée avec une sonde), la prochaine chauffe, et un bouton « Chauffer maintenant » jusqu’au plein.
+- Une chauffe complète par semaine pour l’hygiène, au plus 4 démarrages par jour, jamais au-dessus du disjoncteur, et un jour rouge Tempo la chauffe attend la nuit.
+- Le soleil prévu vient de la prévision de la page Énergie (Forecast.Solar, Solcast…), sinon des nuages annoncés par Hestia Météo, sinon du soleil de ces derniers jours.
+- Une page **Chauffe-eau** dans l’onglet Énergie : la phrase du moment, le plan, le mode, les réglages (compteur, prise, contenance, puissance, sonde, heures d’eau chaude), le blueprint, et ce que le chauffe-eau a coûté chaque jour comparé au plan de Hestia.
+- Un format **Chauffe-eau** pour la carte, avec le plan des prochaines heures dessiné à l’échelle.
+- Pour les autres briques : `water_heater()` dans l’interface v1 (un ajout, rien ne change pour Hestia Chauffage).
+
+- **Un seul coût du chauffage** : avec Hestia Chauffage 1.1 ou plus récente, la carte Chauffage et le Bilan montrent le coût du chauffage tel que Hestia Chauffage le compte (radiateurs au prix de chaque heure, poêle au prix de ses sacs) : aujourd’hui, hier et depuis le 1er du mois, avec ce que le poêle fait gagner. Énergie ne le recompte pas de son côté. Sans Hestia Chauffage, rien ne change : les radiateurs restent estimés d’après le froid.
+
+### Améliorations
+
+- Quand le chauffe-eau est piloté par Hestia, le conseil « programmez le chauffe-eau » disparaît : il n’a plus lieu d’être.
+
+### Documentation
+
+- Une page pour le chauffe-eau : [docs/chauffe-eau.md](docs/chauffe-eau.md).
+
 ## 1.0.0b10 — Les heures creuses tapées s’enregistrent
 
 ### Corrections
