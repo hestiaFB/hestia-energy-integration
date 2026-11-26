@@ -1,4 +1,5 @@
 import {LitElement,html,nothing,css,type TemplateResult} from 'lit';
+import {live} from 'lit/directives/live.js';
 import {customElement,property,state} from 'lit/decorators.js';
 import {hubStyles,modernStyles,pageStyles,listSection,listRow,saveBar,segmented,toggle,moreRow,helpTip,aboutPage,kpis,SOCLE} from './socle/ui';
 
@@ -6,7 +7,8 @@ import {hubStyles,modernStyles,pageStyles,listSection,listRow,saveBar,segmented,
    INTERFACE.md § 5): Vue d'ensemble · Sources · Appareils · Chauffe-eau (1.0.1b1) · Réglages · Extensions · Bilan · À propos.
    Everything shown comes from the integration (hestia_energy/hub, settings, periods); the tab computes nothing but sums. */
 
-type Hass={callWS:<T>(msg:Record<string,unknown>)=>Promise<T>;states:Record<string,{state:string;attributes:Record<string,unknown>}>;language?:string};
+type Hass={callWS:<T>(msg:Record<string,unknown>)=>Promise<T>;states:Record<string,{state:string;attributes:Record<string,unknown>}>;language?:string;
+ entities?:Record<string,{entity_category?:string|null;hidden?:boolean;platform?:string}>};
 type Todo={titre:string;texte:string;page:string;sur?:string};
 type Period={debut:string;kwh_achetes:number;euros:number|null;euros_energie:number|null;soleil_couvre:number|null;revendu_euros:number|null;soleil_kwh?:number|null};
 type Source={id:string;groupe:string;nom:string;usage:string;etat:'ok'|'todo';sous?:string|null;chiffres:{texte:string;benefice?:boolean}[];
@@ -37,7 +39,7 @@ type Settings={reglages:Record<string,unknown>;trouve:{option:Found<string>;offp
  margin:Found<number>;sac_kg:number|null;notify:{id:string;nom:string}[];a:{revente:boolean;eau:boolean;poele:boolean;delestage:boolean;un_compteur:boolean}}};
 
 const REPO='https://github.com/hestiaFB/hestia-energy-integration';
-const VERSION='1.0.1b1';
+const VERSION='1.0.1b2';
 const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
 const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
  ['automatique','Automatique','Hestia décide des chauffes ; votre automatisation allume et éteint la prise.'],
@@ -70,6 +72,22 @@ function ago(iso:string|null|undefined){
 }
 const parseHc=(s:unknown):[string,string][]|null=>typeof s==='string'&&s.trim()?s.split(',').map(r=>r.split('-').map(x=>x.trim().replace('h',':').padStart(5,'0')) as [string,string]):null;
 const hcText=(l:[string,string][])=>l.filter(([a,b])=>a&&b).map(([a,b])=>`${a}-${b}`).join(', ')||null;
+
+let pickerLoad:Promise<string|null>|undefined;
+/** Home Assistant's own entity picker (filtered list with a search), as in Hestia Confort. HA loads it lazily: a card
+    editor makes it available to this page. Without it, a plain list remains. */
+function loadPicker():Promise<string|null>{
+ pickerLoad??=(async()=>{
+  const tag=()=>customElements.get('ha-selector')?'ha-selector':customElements.get('ha-entity-picker')?'ha-entity-picker':null;
+  if(tag())return tag();
+  try{const helpers=await (window as unknown as {loadCardHelpers?:()=>Promise<{createCardElement:(c:object)=>Promise<HTMLElement>}>}).loadCardHelpers?.();
+   if(helpers)for(const config of [{type:'tile',entity:'sun.sun'},{type:'entities',entities:['sun.sun']}]){const card=await helpers.createCardElement(config);await (card.constructor as unknown as {getConfigElement?:()=>Promise<unknown>}).getConfigElement?.();if(tag())break;}}
+  catch{/* the plain list remains */}
+  for(let i=0;i<30&&!tag();i++)await new Promise(r=>setTimeout(r,100));
+  return tag();
+ })();
+ return pickerLoad;
+}
 
 @customElement('hestia-energy-setup')
 export class HestiaEnergySetup extends LitElement {
@@ -121,9 +139,10 @@ export class HestiaEnergySetup extends LitElement {
  @state() private leaving?:string;
  // The off-peak rows as typed, a half-filled one included: kept here until both its ends are set (issue 21).
  @state() private hcRows?:[string,string][];
+ @state() private pickerTag:string|null=null;
  private loadedFor?:string;
 
- connectedCallback(){super.connectedCallback();window.addEventListener('beforeunload',this.beforeUnload);void this.load();}
+ connectedCallback(){super.connectedCallback();window.addEventListener('beforeunload',this.beforeUnload);void this.load();void loadPicker().then(tag=>{this.pickerTag=tag;});}
  disconnectedCallback(){super.disconnectedCallback();window.removeEventListener('beforeunload',this.beforeUnload);}
  private beforeUnload=(e:BeforeUnloadEvent)=>{if(this.count()){e.preventDefault();e.returnValue='';}};
  // A new `hass` comes at every change of state in the home: the tab redraws only for its own data.
@@ -341,11 +360,20 @@ export class HestiaEnergySetup extends LitElement {
  private heaterPage(h:Hub){
   const w=h.chauffe_eau,s=this.heaterVal(),states=this.hass?.states??{},devices=h.chauffe_eau_appareils??[];
   const mode=s.mode??w?.mode??'simulation',sim=mode==='simulation';
-  const ids=(test:(id:string,a:Record<string,unknown>)=>boolean)=>Object.keys(states).filter(id=>test(id,states[id].attributes)).sort();
-  const plugs=ids(id=>/^(switch|input_boolean|light)\./.test(id)),probes=ids((id,a)=>id.startsWith('water_heater.')||(id.startsWith('sensor.')&&a.device_class==='temperature'));
+  // Only what can be a water heater's plug or probe: no settings or diagnostics of other devices (a camera's « Flip »),
+  // no hidden entity, nothing of Hestia's own; the one already chosen always stays in the list.
+  const usable=(id:string)=>{const e=this.hass?.entities?.[id];return !e||(!e.entity_category&&!e.hidden&&!id.startsWith('switch.hestia_')&&!id.startsWith('sensor.hestia_'));};
+  const ids=(test:(id:string,a:Record<string,unknown>)=>boolean,k:'prise'|'sonde')=>Object.keys(states).filter(id=>id===s[k]||(usable(id)&&test(id,states[id].attributes))).sort();
+  const plugs=ids(id=>/^(switch|input_boolean|light)\./.test(id),'prise'),probes=ids((id,a)=>id.startsWith('water_heater.')||(id.startsWith('sensor.')&&a.device_class==='temperature'),'sonde');
   const label=(id:string)=>(states[id]?.attributes.friendly_name as string|undefined)??id;
-  const pick=(k:'prise'|'sonde'|'appareil',l:string,list:[string,string][],none:string)=>html`<select aria-label=${l} @change=${(e:Event)=>{const v=(e.target as HTMLSelectElement).value;this.setHeater(k,v||null);}}>
+  const select=(k:'prise'|'sonde'|'appareil',l:string,list:[string,string][],none:string)=>html`<select aria-label=${l} @change=${(e:Event)=>{const v=(e.target as HTMLSelectElement).value;this.setHeater(k,v||null);}}>
     <option value="" ?selected=${!s[k]}>${none}</option>${list.map(([id,n])=>html`<option value=${id} ?selected=${s[k]===id}>${n}</option>`)}</select>`;
+  // An entity: Home Assistant's picker, filtered, with its search (its cross clears the choice); else the plain list.
+  const pick=(k:'prise'|'sonde',l:string,list:string[])=>this.pickerTag==='ha-selector'
+   ?html`<ha-selector .hass=${this.hass} .selector=${{entity:{include_entities:list}}} .value=${live(s[k]??'')} .required=${false} .label=${l} @value-changed=${(e:CustomEvent)=>this.setHeater(k,e.detail?.value||null)}></ha-selector>`
+   :this.pickerTag==='ha-entity-picker'
+   ?html`<ha-entity-picker .hass=${this.hass} .includeEntities=${list} .value=${live(s[k]??'')} .required=${false} .label=${l} @value-changed=${(e:CustomEvent)=>this.setHeater(k,e.detail?.value||null)}></ha-entity-picker>`
+   :select(k,l,list.map(id=>[id,label(id)]),'Aucune');
   const numIn=(k:'litres'|'puissance_w'|'consigne',l:string,unit:string,step:number,ph:string)=>html`<input type="number" step=${step} min="0" aria-label=${l} placeholder=${ph}
     .value=${s[k]!=null?String(s[k]):''} @change=${(e:Event)=>{const v=(e.target as HTMLInputElement).value;this.setHeater(k,v===''?null:Number(v));}}><span class="nk-unit">${unit}</span>`;
   const hours=s.heures??['07:00','20:00'];
@@ -371,12 +399,12 @@ export class HestiaEnergySetup extends LitElement {
      value:segmented('Mode',HEATER_MODES.map(m=>[m[0],m[1]]) as [string,string][],mode,v=>this.setHeater('mode',v))})],
      {help:'Commencez en Simulation : regardez le plan quelques jours, puis passez en Automatique. Le bouton « Chauffe-eau : chauffer maintenant » demande une chauffe jusqu’au plein.'})}
    ${listSection('Votre chauffe-eau',[
-    listRow({label:'Le compteur',control:true,sub:'Sa consommation, dans la page Énergie de Home Assistant.',value:pick('appareil','Le compteur',devices.map(d=>[d.stat,d.nom]),'Trouvé par son nom')}),
+    listRow({label:'Le compteur',control:true,sub:'Sa consommation, dans la page Énergie de Home Assistant.',value:select('appareil','Le compteur',devices.map(d=>[d.stat,d.nom]),'Trouvé par son nom')}),
     listRow({label:'La prise',control:true,sub:s.prise?(w?.prise_etat?`Elle est sur « ${w.prise_etat==='on'?'allumée':w.prise_etat==='off'?'éteinte':w.prise_etat} ».${w.suit===false?' Elle ne suit pas Hestia : vérifiez l’automatisation.':''}`:undefined):'Celle que votre automatisation allume et éteint.',
-     value:pick('prise','La prise',plugs.map(id=>[id,label(id)]),'Aucune')}),
+     value:pick('prise','La prise',plugs)}),
     listRow({label:'Sa contenance',control:true,value:numIn('litres','Sa contenance','litres',10,'200')}),
     listRow({label:'Sa puissance',control:true,sub:w?.puissance_kw?`Mesurée : ${num(w.puissance_kw*1000)} W.`:undefined,value:numIn('puissance_w','Sa puissance','W',100,w?.puissance_kw?String(Math.round(w.puissance_kw*1000)):'2400')}),
-    listRow({label:'Une sonde de température',control:true,sub:'Facultative : avec elle, la réserve est mesurée au lieu d’être estimée.',value:pick('sonde','Une sonde de température',probes.map(id=>[id,label(id)]),'Aucune')}),
+    listRow({label:'Une sonde de température',control:true,sub:'Facultative : avec elle, la réserve est mesurée au lieu d’être estimée.',value:pick('sonde','Une sonde de température',probes)}),
     ...(s.sonde?[listRow({label:'Sa température de consigne',control:true,value:numIn('consigne','Sa température de consigne','°C',1,'60')})]:[]),
    ],{help:'Laissés vides, la puissance et le besoin s’apprennent sur les 4 dernières semaines de mesures.'})}
    ${listSection('L’eau chaude',[
