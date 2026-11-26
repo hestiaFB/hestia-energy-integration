@@ -16,7 +16,9 @@ Sans chauffe-eau mesuré, indiquez sa prise et sa puissance dans la page Chauffe
 
 ## Comment Hestia décide
 
-Toutes les 5 minutes, Hestia refait le plan des 36 prochaines heures, quart d’heure par quart d’heure. Elle cherche la façon la moins chère d’avoir assez d’eau chaude aux heures où vous en avez besoin (par défaut 7 h et 20 h).
+Toutes les 5 minutes, Hestia refait le plan des 36 prochaines heures, quart d’heure par quart d’heure. Elle cherche la façon la moins chère d’avoir assez d’eau chaude aux moments où vous en tirez (par défaut 7 h et 20 h).
+
+Ces moments se règlent dans la page Chauffe-eau, sous « Quand on tire l’eau chaude ». Ce sont des heures, pas des plages : par exemple « vers 6 h 30 » pour les douches du matin. Le ballon doit être assez chaud avant chacune. L’eau du jour est partagée à parts égales entre elles et tirée dans l’heure qui suit chaque moment. Un quart du besoin compte comme les pertes du ballon, réparties sur toute la journée.
 
 Pour chaque quart d’heure, elle connaît :
 

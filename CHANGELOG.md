@@ -1,3 +1,9 @@
+## À venir
+
+### Améliorations
+
+- Page Chauffe-eau : « Les heures où l’on en a besoin » devient « Quand on tire l’eau chaude ». La page dit maintenant que ce sont des moments (« vers 6 h 30 »), pas des plages horaires : le ballon est assez chaud avant chacun, et l’eau du jour est partagée entre eux. Les moments se rangent dans l’ordre de la journée.
+
 ## 1.0.1b2 — Choisir la prise et la sonde du chauffe-eau
 
 ### Corrections
