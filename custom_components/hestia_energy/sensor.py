@@ -97,7 +97,7 @@ SENSORS = (
         key="couleur_tempo_demain", translation_key="couleur_tempo_demain", device_class=SensorDeviceClass.ENUM,
         options=["bleu", "blanc", "rouge"], value=lambda d: _direct(d).get("couleur_demain"),
         exists=lambda d: bool((d.get("extensions") or {}).get("tempo_tomorrow"))),
-    # The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md).
+    # The water heater driven by Hestia (1.0.1b1, docs/chauffe-eau.md).
     EnergySensorDescription(
         key="chauffe_eau_reserve", translation_key="chauffe_eau_reserve", native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT, icon="mdi:water-percent",

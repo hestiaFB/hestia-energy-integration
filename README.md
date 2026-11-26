@@ -15,7 +15,7 @@
 
 Elle donne le résultat à **sa carte**, fournie avec elle, et à vos automatisations.
 
-> **Préversion (bêta) 1.0.0b11.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
+> **Préversion (bêta) 1.0.1b1.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
 
 ![Hestia Énergie — l’électricité de la maison, expliquée en euros : la carte complète avec son horloge de la journée, la frise du lave-linge, entre « En ce moment » et « Ce mois-ci »](docs/images/hestia-energy-banner.png)
 
@@ -100,7 +100,7 @@ Par exemple : lancer le chauffe-eau quand **Soleil en trop** passe à oui, ou co
 
 ## Le chauffe-eau piloté
 
-Nouveau dans la 1.0.0b11 : Hestia fait le plan de chauffe d’un chauffe-eau sur une prise connectée. Au soleil quand il y en aura, en heures creuses sinon, selon le temps de demain, sans jamais manquer d’eau chaude. Elle ne le commande pas elle-même : un capteur dit quand chauffer, et votre automatisation (un blueprint est fourni) allume la prise. Il démarre en **Simulation** : rien n’est commandé tant que vous ne passez pas en Automatique. [Le chauffe-eau en détail](docs/chauffe-eau.md).
+Nouveau dans la 1.0.1b1 : Hestia fait le plan de chauffe d’un chauffe-eau sur une prise connectée. Au soleil quand il y en aura, en heures creuses sinon, selon le temps de demain, sans jamais manquer d’eau chaude. Elle ne le commande pas elle-même : un capteur dit quand chauffer, et votre automatisation (un blueprint est fourni) allume la prise. Il démarre en **Simulation** : rien n’est commandé tant que vous ne passez pas en Automatique. [Le chauffe-eau en détail](docs/chauffe-eau.md).
 
 Hestia Énergie reconnaît seule HA Linky, linkytic, RTE Tempo, OpenDTU, Comwatt, Versatile Thermostat, Suivi Stock Pellet et Hestia Weather. Elle les lit, ne les commande jamais, et chacune se coupe d’un interrupteur. [Les extensions](docs/extensions.md).
 
@@ -132,7 +132,7 @@ Hestia Énergie conseille. Elle n’allume, n’éteint et ne règle rien : mêm
 
 Pas encore vérifié sur une vraie maison :
 
-- **Le chauffe-eau piloté** (1.0.0b11) : il démarre en Simulation, pour regarder ses plans avant de lui confier la prise.
+- **Le chauffe-eau piloté** (1.0.1b1) : il démarre en Simulation, pour regarder ses plans avant de lui confier la prise.
 - **Tempo** : les couleurs et leurs prix sont comptés, mais aucune maison en Tempo n’a encore servi d’essai.
 - **Gaz, bois, fioul** : pas encore comptés. Le poêle à granulés l’est, avec Suivi Stock Pellet.
 - **Pompe à chaleur** : sa consommation est comptée avec le reste de l’électricité, mais aucune maison équipée n’a encore servi d’essai.

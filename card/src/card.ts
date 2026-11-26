@@ -46,10 +46,10 @@ type View={pret:boolean;palier:number;equipement:{direct?:boolean;soleil?:boolea
  pointe?:{h:number;kw:number;part:number|null}|null;
  chauffage?:{etat:string;mois?:Heat|null;saison?:(Heat&{du:string})|null;euros_par_degre?:number|null;poele?:Stove|null};
  usage?:Usage|null;chauffe_eau?:Heater|null;cout_chauffage?:HeatCost|null};
-/** The heating's cost as Hestia Heating counts it (1.0.0b11, « un seul coût »): shown as it is, in place of Énergie's estimate. */
+/** The heating's cost as Hestia Heating counts it (1.0.1b1, « un seul coût »): shown as it is, in place of Énergie's estimate. */
 type HeatDay={jour:string;electrique_kwh:number|null;electrique_eur:number|null;granules_kg:number|null;granules_eur:number|null;chauffage_eur:number|null;gagne_eur:number|null;prix:string|null};
 type HeatCost={aujourdhui:HeatDay;hier:HeatDay|null;mois:Omit<HeatDay,'jour'|'prix'>&{jours:number;du:string};par:string};
-/** The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md): its plan, its reserve, its mode. `courbe`: each
+/** The water heater driven by Hestia (1.0.1b1, docs/chauffe-eau.md): its plan, its reserve, its mode. `courbe`: each
     half hour from now, [start, reserve %, sun to spare forecast kW, price, off-peak 1/0, the heating's source or null]. */
 type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;

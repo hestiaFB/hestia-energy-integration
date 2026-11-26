@@ -1,4 +1,4 @@
-## 1.0.0b11 — Le chauffe-eau piloté
+## 1.0.1b1 — Le chauffe-eau piloté
 
 ### Nouveautés
 

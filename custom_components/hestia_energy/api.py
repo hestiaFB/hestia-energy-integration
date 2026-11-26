@@ -158,7 +158,7 @@ class HestiaEnergyApi:
         return None
 
     def water_heater(self) -> dict | None:
-        """The water heater driven by Hestia (1.0.0b11): whether it heats now and why, its reserve (%), the next heating,
+        """The water heater driven by Hestia (1.0.1b1): whether it heats now and why, its reserve (%), the next heating,
         the plan ({debut, fin, source, kwh, euros}), the mode (« simulation »: nothing is commanded). None without one."""
         if not self.coordinator:
             return None

@@ -1,4 +1,4 @@
-"""« Chauffe-eau : mode » (1.0.0b11, docs/chauffe-eau.md): Simulation (the default: nothing is commanded), Automatique,
+"""« Chauffe-eau : mode » (1.0.1b1, docs/chauffe-eau.md): Simulation (the default: nothing is commanded), Automatique,
 Heures creuses seules, Vacances. A setting of Hestia Energy itself, kept with the others."""
 from __future__ import annotations
 

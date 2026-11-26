@@ -18,7 +18,7 @@ CARD_FILE = "hestia-energy-card.js"
 CARD_URL = f"{ASSETS}/{CARD_FILE}"
 # The tab's menu (socle 1.20): [path, label, icon]. Icons from the socle's hubIcon(); its own energy icons come with the tab.
 # The page Contrat is gone: its settings are in Réglages (INTERFACE.md § 5, H1). Appareils is hidden without devices.
-# Chauffe-eau (1.0.0b11) only for a home with a water heater (or its plug and power typed in the settings).
+# Chauffe-eau (1.0.1b1) only for a home with a water heater (or its plug and power typed in the settings).
 MENU = [["", "Vue d’ensemble", "home"], ["sources", "Sources", "entities"], ["appareils", "Appareils", "light"],
         ["chauffe-eau", "Chauffe-eau", "temperature"], ["reglages", "Réglages", "settings"], ["extensions", "Extensions", "extensions"],
         ["bilan", "Bilan", "review"], ["a-propos", "À propos", "info"]]

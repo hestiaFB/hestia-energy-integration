@@ -305,7 +305,7 @@ button.piste:focus-visible { outline:2px solid var(--nw-accent); outline-offset:
 .smonths .sm i { align-self:end; border-radius:4px 4px 2px 2px; background:var(--nw-sun); }
 .smonths .sm small { font-size:var(--nw-fs-small); color:var(--nw-fg2); }
 .u-kva { margin-top:auto; padding-top:6px; }
-/* The water heater's plan (1.0.0b11): reserve, sun forecast, heatings by source, the price of each half hour. */
+/* The water heater's plan (1.0.1b1): reserve, sun forecast, heatings by source, the price of each half hour. */
 .whc { display:block; width:100%; height:auto; }
 .whc .gl { stroke:var(--nw-line-soft); stroke-width:1; }
 .whc .tk { font-size:10px; fill:var(--nw-fg2); }

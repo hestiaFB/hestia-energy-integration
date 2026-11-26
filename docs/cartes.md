@@ -16,7 +16,7 @@ Une seule carte, **Hestia Énergie**, en plusieurs formats. Chacun répond à un
 | **Appareils** | Ce que chaque appareil a consommé aujourd’hui, en kWh et en euros. |
 | **Pointe** | La plus forte puissance prise aujourd’hui, face à votre abonnement. |
 | **Contrat** | Vos heures creuses et vos prix ce mois-ci, et ce qu’aurait coûté l’option Base. |
-| **Chauffe-eau** | Le chauffe-eau piloté (1.0.0b11) : sa réserve, son plan des prochaines heures, ses chauffes et ce qu’elles ont coûté. Voir [le chauffe-eau](chauffe-eau.md). |
+| **Chauffe-eau** | Le chauffe-eau piloté (1.0.1b1) : sa réserve, son plan des prochaines heures, ses chauffes et ce qu’elles ont coûté. Voir [le chauffe-eau](chauffe-eau.md). |
 
 ## La carte complète
 

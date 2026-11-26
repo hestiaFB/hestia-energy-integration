@@ -1,4 +1,4 @@
-"""The water heater driven by Hestia Energy (1.0.0b11): a heating plan for the next hours, made again every 5 minutes.
+"""The water heater driven by Hestia Energy (1.0.1b1): a heating plan for the next hours, made again every 5 minutes.
 
 Hestia Energy commands nothing: it publishes « Chauffe-eau : chauffer » (on / off), and the household's automation
 (the blueprint « Piloter le chauffe-eau avec Hestia Énergie ») switches the plug. In « Simulation », the default, the

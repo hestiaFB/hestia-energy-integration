@@ -3,7 +3,7 @@ import {customElement,property,state} from 'lit/decorators.js';
 import {hubStyles,modernStyles,pageStyles,listSection,listRow,saveBar,segmented,toggle,moreRow,helpTip,aboutPage,kpis,SOCLE} from './socle/ui';
 
 /* The « Énergie » tab of the Hestia-FB panel, as validated by Frank on 8 Nov. 2026 (hestia-energie/docs/maquette-hub-energie.html,
-   INTERFACE.md § 5): Vue d'ensemble · Sources · Appareils · Chauffe-eau (1.0.0b11) · Réglages · Extensions · Bilan · À propos.
+   INTERFACE.md § 5): Vue d'ensemble · Sources · Appareils · Chauffe-eau (1.0.1b1) · Réglages · Extensions · Bilan · À propos.
    Everything shown comes from the integration (hestia_energy/hub, settings, periods); the tab computes nothing but sums. */
 
 type Hass={callWS:<T>(msg:Record<string,unknown>)=>Promise<T>;states:Record<string,{state:string;attributes:Record<string,unknown>}>;language?:string};
@@ -24,7 +24,7 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
  bilans:{id:string;titre:string;texte:string;euros:number|null;kwh:number}[];chauffage:{etat:string;mois?:{kwh:number;eur:number|null}|null;poele?:{saison?:{kg:number;eur:number|null}}|null}|null;
  eau:{mois_l:number;mois_euros:number|null}|null;sources:Source[];appareils:{liste:Device[];mois:string|null;part:number|null};extensions:Ext[];groupes:[string,string][];
  tarifs:string|null;notifie:boolean;cout_chauffage?:{mois:{chauffage_eur:number|null;electrique_eur:number|null;granules_eur:number|null;electrique_kwh:number|null;granules_kg:number|null;jours:number}}|null;chauffe_eau?:Heater|null;chauffe_eau_appareils?:{stat:string;nom:string}[];mis_a_jour?:string;technique?:Tech;pistes:{id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null}[]};
-/** The water heater driven by Hestia (1.0.0b11, chauffe_eau.py): what the card shows, and its settings. */
+/** The water heater driven by Hestia (1.0.1b1, chauffe_eau.py): what the card shows, and its settings. */
 type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
  reserve:number|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
@@ -37,7 +37,7 @@ type Settings={reglages:Record<string,unknown>;trouve:{option:Found<string>;offp
  margin:Found<number>;sac_kg:number|null;notify:{id:string;nom:string}[];a:{revente:boolean;eau:boolean;poele:boolean;delestage:boolean;un_compteur:boolean}}};
 
 const REPO='https://github.com/hestiaFB/hestia-energy-integration';
-const VERSION='1.0.0b11';
+const VERSION='1.0.1b1';
 const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
 const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
  ['automatique','Automatique','Hestia décide des chauffes ; votre automatisation allume et éteint la prise.'],
@@ -334,7 +334,7 @@ export class HestiaEnergySetup extends LitElement {
    ${this.fixedRow(d.corrige)}`;
  }
 
- /* ── Chauffe-eau (1.0.0b11): the plan Hestia makes, its mode, and what it needs to know. Hestia never commands the
+ /* ── Chauffe-eau (1.0.1b1): the plan Hestia makes, its mode, and what it needs to know. Hestia never commands the
     heater itself: the household's automation (the blueprint) follows binary_sensor.hestia_energy_chauffe_eau. ── */
  private heaterVal():HeaterSettings{return (this.val<HeaterSettings|null>('chauffe_eau')??{}) as HeaterSettings;}
  private setHeater(k:keyof HeaterSettings,v:unknown){this.set('chauffe_eau',{...this.heaterVal(),[k]:v});}
