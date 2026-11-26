@@ -47,9 +47,13 @@ Les autres règles :
 
 ## La réserve
 
-Hestia estime l’eau chaude qui reste, en kWh et en pourcentage : la chauffe la remplit, les douches et les pertes la vident. Le besoin de chaque jour (semaine et week-end) s’apprend sur les 4 dernières semaines de mesures du chauffe-eau.
+Hestia estime l’eau chaude qui reste, en kWh et en pourcentage : la chauffe la remplit, les douches et les pertes la vident. Le besoin de chaque jour (semaine et week-end) s’apprend sur les 4 dernières semaines de mesures du chauffe-eau : c’est une journée **chargée**, celle que 8 jours sur 10 ne dépassent pas (une journée moyenne laissait le ballon vide un soir sur deux).
+
+Sans sonde, c’est une **estimation** : Hestia ne voit pas l’eau tirée, seulement ce que le chauffe-eau consomme pour la réchauffer. Le minimum à garder (30 % par défaut) est une marge sur cette estimation.
 
 Quand le chauffe-eau est piloté, Hestia voit aussi qu’il est **plein** : la prise est allumée depuis un moment mais il ne tire plus rien (son thermostat a coupé). Avec une sonde, la réserve vient de la température.
+
+En **Simulation**, Hestia suit deux ballons : **le vôtre**, d’après ce que le chauffe-eau consomme vraiment (plein quand il s’arrête tout seul en heures creuses, pas quand les heures creuses finissent), et **celui du plan**, qu’il aurait s’il était piloté. La carte, la page et l’entité « Chauffe-eau : réserve » montrent le vôtre ; celui du plan est à côté (attribut `reserve_plan` de l’entité).
 
 ## Les modes
 

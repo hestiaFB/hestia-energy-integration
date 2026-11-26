@@ -289,3 +289,11 @@ class ReadyForEachRange(unittest.TestCase):
         self.assertGreater(sum(e for e, src in zip(p.energy, p.source) if src in ("soleil", "soleil_partiel")), 0.5, p.runs())
         self.assertEqual(hours_of(p, "heures_pleines"), 0)
         self.assertIsNone(p.short_at)
+
+
+class ABusyDay(unittest.TestCase):
+    """The need learned is a busy day, not the median one: a median day left the tank empty one evening in two."""
+
+    def test_eight_days_in_ten_draw_no_more(self):
+        self.assertEqual(w.busy_day([3, 4, 4, 5, 5, 5, 6, 6, 7, 9]), 6)
+        self.assertEqual(w.busy_day([4.0, 5.0, 6.0]), 6.0)

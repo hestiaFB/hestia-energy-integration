@@ -41,6 +41,7 @@ LOSS_SHARE = 0.25                  # of the day's need, the tank's losses, sprea
 DRAW_HOURS = 1.0                   # a hot-water time given alone (« 07:00 ») draws over this long
 HYGIENE_DAYS = 7                   # a full heating at least once a week (the tank's thermostat cut reached)
 LEARN_DAYS = 28
+BUSY = 0.8                         # the need learned is a busy day: 8 days in 10 draw no more (1.0.1b5; the median before)
 MIN_DAYS = 7
 MIN_ON_KW = 0.3                    # the heater heats above this
 BESIDE_EUR = 0.01                  # € a kWh worth paying to heat next to a heating already planned (one run, not two)
@@ -57,7 +58,7 @@ def _prudence(lead: timedelta) -> float:
 @dataclass(frozen=True)
 class Learned:
     power_kw: float | None             # its power when it heats
-    need_week_kwh: float | None        # its energy a weekday (draws and losses), the median of the last 4 weeks
+    need_week_kwh: float | None        # its energy a weekday (draws and losses): a busy day of the last 4 weeks (BUSY)
     need_weekend_kwh: float | None
     days: int                          # days the need was learned on
     base_kw: tuple[float, ...] = ()    # the rest of the home, each local hour (0 to 23), kW
@@ -76,6 +77,12 @@ class Learned:
 
 def _round(value: float | None, n: int = 2) -> float | None:
     return None if value is None else round(value, n)
+
+
+def busy_day(values: list[float]) -> float:
+    """A busy day: the day that BUSY of the days do not pass (a median day left the tank empty one evening in two)."""
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(BUSY * len(ordered)) - 1)]
 
 
 def learn(heater: list[tuple[datetime, float]], home: list[tuple[datetime, float]], sun: list[tuple[datetime, float]],
@@ -106,8 +113,8 @@ def learn(heater: list[tuple[datetime, float]], home: list[tuple[datetime, float
         strong.sort()
         power = statistics.median(strong[int(len(strong) * 0.8):])
     used = len(week) + len(weekend)
-    need_week = statistics.median(week) if len(week) >= 3 else None
-    need_weekend = statistics.median(weekend) if len(weekend) >= 2 else None
+    need_week = busy_day(week) if len(week) >= 3 else None
+    need_weekend = busy_day(weekend) if len(weekend) >= 2 else None
     if used < MIN_DAYS:
         need_week = need_weekend = None
     by_hour = _rest_of_home(heater, home, tz, now - timedelta(days=14))

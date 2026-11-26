@@ -182,6 +182,34 @@ class InventedHome(unittest.IsolatedAsyncioTestCase):
         _, c = await self.setup({"chauffe_eau": {"mode": "automatique"}})
         self.assertFalse(any(p["id"] == "chauffe_eau_heures" for p in c.data.get("pistes") or []))
 
+    async def test_in_simulation_the_household_tank_is_followed_from_the_heater(self):
+        """Frank, 26 Nov. 2026: « hier soir plus d'eau chaude ». In Simulation the reserve shown is his own tank, full
+        when the heater stops by itself in the off-peak hours, emptied by the day's draws; the plan's is apart."""
+        _, c = await self.setup()
+        h, tz = c.heater, c.tz
+        night = datetime(2026, 11, 26, 23, 0, tzinfo=tz)
+        h.real.kwh, h.real.at = 2.0, night
+        h._follow_real(night, tz, 2400.0, 4.8, [(7 * 60, 60), (20 * 60, 60)], 10.0, None)
+        for minute in range(1, 8):
+            h._follow_real(night + timedelta(minutes=minute), tz, 0.0, 4.8, [(7 * 60, 60), (20 * 60, 60)], 10.0, None)
+        self.assertGreater(h.real.kwh, 9.9)
+        self.assertIsNotNone(h.real.full_at)
+        # Stopped by the end of the off-peak hours (its contactor), not full.
+        h.real.kwh, h.real.full_at = 4.0, None
+        six = datetime(2026, 11, 27, 5, 55, tzinfo=tz)
+        h.real.at = six
+        h._follow_real(six, tz, 2400.0, 4.8, [(7 * 60, 60)], 10.0, None)
+        for minute in range(6, 14):
+            h._follow_real(six + timedelta(minutes=minute), tz, 0.0, 4.8, [(7 * 60, 60)], 10.0, None)
+        self.assertLess(h.real.kwh, 10.0)
+        self.assertIsNone(h.real.full_at)
+        c._update_live()
+        self.assertIn("reserve_reelle", c.data["chauffe_eau"])
+
+    async def test_once_driven_there_is_no_second_tank(self):
+        _, c = await self.setup({"chauffe_eau": {"mode": "automatique"}})
+        self.assertIsNone(c.data["chauffe_eau"]["reserve_reelle"])
+
 
 if __name__ == "__main__":
     unittest.main()

@@ -363,3 +363,4 @@ button.piste:focus-visible { outline:2px solid var(--nw-accent); outline-offset:
 .duo .v { display:grid; text-align:right; font-variant-numeric:tabular-nums; line-height:1.2; } .duo .v small { color:var(--nw-fg2); font-size:var(--nw-fs-small); }
 .duo + .nw-legend { margin-top:8px; justify-content:flex-start; }
 .hb.list .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--c); margin-right:6px; vertical-align:1px; }
+.ans-n { color:var(--nw-fg2); }

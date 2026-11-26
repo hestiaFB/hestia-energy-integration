@@ -55,7 +55,7 @@ type HeatCost={aujourdhui:HeatDay;hier:HeatDay|null;mois:Omit<HeatDay,'jour'|'pr
     half hour from now, [start, reserve %, sun to spare forecast kW, price, off-peak 1/0, the heating's source or null]. */
 type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
- reserve:number|null;reserve_kwh:number|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
+ reserve:number|null;reserve_kwh:number|null;reserve_reelle?:number|null;reserve_reelle_kwh?:number|null;sonde?:boolean;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
  manque_a:string|null;courbe:[string,number,number,number|null,number,string|null][];soleil_prevu:string|null;plein_le:string|null;heures:number[];plages?:[number,number][];reserve_min:number;
  bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
  manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
@@ -524,7 +524,7 @@ class HestiaEnergyCard extends LitElement {
   if(p)out.push(this._go('pointe','bolt','--nw-grid','Pointe · aujourd\'hui',kw(p.kw*1000),'kW au plus fort',
    v.contrat?.kva?`Sur ${v.contrat.kva} kVA : ${p.part!=null&&p.part>=.7?'près de la limite':'de la marge'}.`:'L\'heure la plus chargée.'));
   const w=v.chauffe_eau;
-  if(w)out.push(this._go('chauffe_eau','heater','--nw-water',`Chauffe-eau · ${w.simulation?'simulation':'piloté'}`,w.reserve!=null?String(w.reserve):'—','% de réserve',
+  if(w)out.push(this._go('chauffe_eau','heater','--nw-water',`Chauffe-eau · ${w.simulation?'simulation':'piloté'}`,(w.reserve_reelle??w.reserve)!=null?String(w.reserve_reelle??w.reserve):'—','% de réserve',
    w.chauffer?HEAT_NOW[w.raison]??'Il chauffe.':w.prochaine_chauffe?`Prochaine chauffe à ${clock(new Date(w.prochaine_chauffe))}.`:'Pas de chauffe prévue.'));
   const c=v.contrat;
   if(c?.option==='hphc'&&c.part_hc!=null)out.push(this._go('contrat','doc','--nw-benefit','Contrat · ce mois-ci',String(Math.round(c.part_hc*100)),
@@ -855,7 +855,11 @@ class HestiaEnergyCard extends LitElement {
   const settings=this._enc('Réglages',html`Mode <b>${MODE_W[w.mode]??w.mode}</b>${w.simulation?' : Hestia montre ce qu’il ferait, votre automatisation ne fait rien.':'.'}
     ${w.suit===false?html` <b>La prise ne suit pas le plan</b> : vérifiez l’automatisation.`:nothing}${todo.length?html` Il manque ${todo.join(', ')}.`:nothing}`,nothing,
    {foot:html`<a class="to-hub" href="/hestia/energie/chauffe-eau" @click=${toHub}>Régler le chauffe-eau ›</a>`});
-  return html`${this._ans({...head,pill,val:w.reserve!=null?String(w.reserve):'—',unit:'%',cap:`d'eau chaude en réserve${w.reserve_kwh!=null?`, ${kwh(w.reserve_kwh)} kWh sur ${kwh(w.capacite_kwh)}`:''}`,why:w.phrase})}
+  // Simulation: the household's own tank first (followed from what the heater really takes), the plan's after.
+  const own=w.simulation&&w.reserve_reelle!=null,shown=own?w.reserve_reelle!:w.reserve,shownKwh=own?w.reserve_reelle_kwh:w.reserve_kwh;
+  const est=w.sonde?'':', estimée';
+  return html`${this._ans({...head,pill,val:shown!=null?String(shown):'—',unit:'%',cap:`d'eau chaude ${own?'dans votre ballon':'en réserve'}${est}${shownKwh!=null?`, ${kwh(shownKwh)} kWh sur ${kwh(w.capacite_kwh)}`:''}`,
+   why:own?html`${w.phrase} <span class="ans-n">Le plan part du ballon qu’aurait Hestia en le pilotant : ${w.reserve??'—'} %.</span>`:w.phrase})}
    <div class="encs">${plan}${next}${review}${settings}</div>`;
  }
 

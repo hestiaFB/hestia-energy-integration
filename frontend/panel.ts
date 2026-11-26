@@ -29,7 +29,7 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
 /** The water heater driven by Hestia (1.0.1b1, chauffe_eau.py): what the card shows, and its settings. */
 type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
- reserve:number|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
+ reserve:number|null;reserve_reelle?:number|null;sonde?:boolean;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
  soleil_prevu:string|null;plein_le:string|null;bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
  appris:{days?:number}|null;manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 type HeaterSettings={mode?:string;appareil?:string|null;prise?:string|null;sonde?:string|null;litres?:number|null;puissance_w?:number|null;heures?:string[];reserve_min?:number;demarrages?:number;consigne?:number};
@@ -394,7 +394,8 @@ export class HestiaEnergySetup extends LitElement {
   const days=(w?.bilan??[]).slice().reverse();
   return html`${this.head('Chauffe-eau',{pill:w?pill:undefined,lead:w?.phrase||(w?undefined:'Hestia décide quand chauffer : au soleil quand il y en a, en heures creuses sinon, sans jamais manquer d’eau chaude.'),
     help:'Hestia ne commande jamais le chauffe-eau. Il allume ou éteint « binary_sensor.hestia_energy_chauffe_eau » ; c’est votre automatisation qui suit et commande la prise. En Simulation, elle ne fait rien.'})}
-   ${w?kpis([{value:w.reserve!=null?w.reserve+' %':'—',label:'d’eau chaude, estimée'},
+   ${w?kpis([...(w.simulation&&w.reserve_reelle!=null?[{value:w.reserve_reelle+' %',label:`dans votre ballon${w.sonde?'':', estimée'}`},{value:w.reserve!=null?w.reserve+' %':'—',label:'avec le plan de Hestia'}]
+      :[{value:w.reserve!=null?w.reserve+' %':'—',label:`d’eau chaude${w.sonde?'':', estimée'}`}]),
      {value:w.chauffer?(w.jusqu_a?'jusqu’à '+hm(new Date(w.jusqu_a)):'en cours'):w.prochaine_chauffe?when(w.prochaine_chauffe):'—',label:w.chauffer?'chauffe':'prochaine chauffe'},
      {value:w.cout_prevu!=null?eur(w.cout_prevu):'—',label:w.kwh_prevus!=null?`prévus pour ${kwh(w.kwh_prevus)}`:'prévus'}]):nothing}
    ${todo.length?listSection('À régler',todo):nothing}
