@@ -39,7 +39,7 @@ type Settings={reglages:Record<string,unknown>;trouve:{option:Found<string>;offp
  margin:Found<number>;sac_kg:number|null;notify:{id:string;nom:string}[];a:{revente:boolean;eau:boolean;poele:boolean;delestage:boolean;un_compteur:boolean}}};
 
 const REPO='https://github.com/hestiaFB/hestia-energy-integration';
-const VERSION='1.0.1b3';
+const VERSION='1.0.1b4';
 const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
 const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
  ['automatique','Automatique','Hestia décide des chauffes ; votre automatisation allume et éteint la prise.'],
@@ -377,11 +377,12 @@ export class HestiaEnergySetup extends LitElement {
   const numIn=(k:'litres'|'puissance_w'|'consigne',l:string,unit:string,step:number,ph:string)=>html`<input type="number" step=${step} min="0" aria-label=${l} placeholder=${ph}
     .value=${s[k]!=null?String(s[k]):''} @change=${(e:Event)=>{const v=(e.target as HTMLInputElement).value;this.setHeater(k,v===''?null:Number(v));}}><span class="nk-unit">${unit}</span>`;
   // Ranges (« 06:00-09:00 », Frank on 26 Nov. 2026); a time alone, kept before 1.0.1b3, is shown as an hour from it.
+  // Kept in the order shown: sorting them on each change moved the edited range under another row's inputs (1.0.1b4).
   const pad=(m:number)=>`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
   const toRange=(x:string):[string,string]=>{const [a,b]=x.split('-');if(b)return [a,b];const [h,m]=a.split(':').map(Number);return [a,pad(h*60+(m||0)+60)];};
   const hours=(s.heures??['06:00-09:00','19:00-23:00']).map(toRange);
-  const setHours=(l:[string,string][])=>this.setHeater('heures',l.filter(([a,b])=>a&&b&&a!==b).map(([a,b])=>`${a}-${b}`).sort());
-  const hourIn=(i:number,j:0|1)=>html`<input type="time" aria-label=${`${j?'Fin':'Début'} de la plage ${i+1}`} .value=${hours[i][j]} @change=${(e:Event)=>{const l=hours.map(r=>[...r] as [string,string]);l[i][j]=(e.target as HTMLInputElement).value;setHours(l);}}>`;
+  const setHours=(l:[string,string][])=>this.setHeater('heures',l.filter(([a,b])=>a&&b&&a!==b).map(([a,b])=>`${a}-${b}`));
+  const hourIn=(i:number,j:0|1)=>html`<input type="time" aria-label=${`${j?'Fin':'Début'} de la plage ${i+1}`} .value=${live(hours[i][j])} @change=${(e:Event)=>{const l=hours.map(r=>[...r] as [string,string]);l[i][j]=(e.target as HTMLInputElement).value;setHours(l);}}>`;
   const when=(iso:string)=>{const d=new Date(iso),today=new Date(),tomorrow=new Date();tomorrow.setDate(today.getDate()+1);
    return d.toDateString()===today.toDateString()?hm(d):d.toDateString()===tomorrow.toDateString()?`demain ${hm(d)}`:`${DAYS[d.getDay()]} ${hm(d)}`;};
   const missing:Record<string,[string,string]>={appareil:['Choisissez le chauffe-eau','Parmi les appareils de la page Énergie, ou indiquez sa prise et sa puissance.'],
@@ -441,7 +442,7 @@ export class HestiaEnergySetup extends LitElement {
   // A range typed one end at a time: the first end stays on screen (it was lost before, and with it the save bar).
   const setHc=(l:[string,string][])=>{this.hcRows=l.length?l:undefined;this.set('offpeak',hcText(l));};
   const wk=this.val<string|null>('offpeak_weekend')??f.offpeak_weekend?.valeur??'pareil';
-  const time=(i:number,j:0|1,v:string)=>html`<input type="time" aria-label=${j?'Fin':'Début'} .value=${v} @change=${(e:Event)=>{const l=(hc??[['','']]).map(r=>[...r] as [string,string]);l[i][j]=(e.target as HTMLInputElement).value;setHc(l);}}>`;
+  const time=(i:number,j:0|1,v:string)=>html`<input type="time" aria-label=${j?'Fin':'Début'} .value=${live(v)} @change=${(e:Event)=>{const l=(hc??[['','']]).map(r=>[...r] as [string,string]);l[i][j]=(e.target as HTMLInputElement).value;setHc(l);}}>`;
   const priceIn=(k:string,ph:number|null|undefined,label:string)=>listRow({label,control:true,value:html`<input type="number" step="0.0001" min="0" aria-label=${label} placeholder=${ph!=null?num(ph,4):''}
    .value=${this.val(k)!=null?String(this.val(k)):''} @change=${(e:Event)=>{const v=(e.target as HTMLInputElement).value;this.set(k,v===''?null:Number(v));}}><span class="nk-unit">€ le kWh</span>`});
   const numIn=(k:string,unit:string,step:number,found:number|null|undefined,why:string|null|undefined,label:string)=>html`<input type="number" step=${step} min="0" aria-label=${label}

@@ -1,3 +1,9 @@
+## 1.0.1b4 — Les plages d’eau chaude se règlent sans se mélanger
+
+### Corrections
+
+- Page Chauffe-eau : changer l’heure d’une plage ne change plus celle d’une autre ligne. Les plages restent dans l’ordre où on les a écrites.
+
 ## 1.0.1b3 — La batterie dans « En ce moment », des plages d’eau chaude
 
 ### Nouveautés
