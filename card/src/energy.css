@@ -331,15 +331,35 @@ button.piste:focus-visible { outline:2px solid var(--nw-accent); outline-offset:
 .smonths .sm i { align-self:end; border-radius:4px 4px 2px 2px; background:var(--nw-sun); }
 .smonths .sm small { font-size:var(--nw-fs-small); color:var(--nw-fg2); }
 .u-kva { margin-top:auto; padding-top:6px; }
-/* The water heater's plan (1.0.1b1): reserve, sun forecast, heatings by source, the price of each half hour. */
-.whc { display:block; width:100%; height:auto; }
+/* The water heater's plan: shapes stretch, words keep their size (1.0.1b4). */
+.whc { display:grid; grid-template-columns:40px minmax(0, 1fr); grid-template-rows:150px 10px 18px; column-gap:6px; row-gap:4px;
+  font-size:var(--nw-fs-small); color:var(--nw-fg2); font-variant-numeric:tabular-nums; }
+.whc .ya { position:relative; } .whc .ya span { position:absolute; right:0; transform:translateY(-50%); white-space:nowrap; }
+.whc .ya span.t { transform:none; } .whc .ya span.b { transform:translateY(-100%); }
+.whc .plot { position:relative; min-width:0; } .whc .plot svg { position:absolute; inset:0; width:100%; height:100%; overflow:visible; }
+.whc svg * { vector-effect:non-scaling-stroke; }
 .whc .gl { stroke:var(--nw-line-soft); stroke-width:1; }
-.whc .tk { font-size:10px; fill:var(--nw-fg2); }
 .whc .sun { fill:color-mix(in oklab, var(--nw-sun) 40%, transparent); }
 .whc .res { fill:none; stroke:var(--nw-water); stroke-width:2.5; stroke-linejoin:round; }
-.whc .min { stroke:var(--nw-act); stroke-width:1; stroke-dasharray:3 4; }
-.whc .hw { stroke:var(--nw-water); stroke-opacity:.35; }
-.whc .hwr { fill:var(--nw-water); fill-opacity:.07; }
-.whc .hwl { font-size:9.5px; font-weight:600; fill:color-mix(in oklab, var(--nw-water) 70%, var(--nw-fg)); }
-.whc .pb { fill-opacity:.5; }
+.whc .min { stroke:var(--nw-act); stroke-width:1.5; stroke-dasharray:4 4; }
+.whc .hwr { fill:color-mix(in oklab, var(--nw-water) 16%, transparent); }
+.whc .yl { text-align:right; line-height:10px; }
+.whc .pb { position:relative; border-radius:3px; overflow:hidden; } .whc .pb i { position:absolute; top:0; bottom:0; }
+.whc .pb .hc { background:color-mix(in oklab, var(--nw-cold) 60%, transparent); } .whc .pb .hp { background:color-mix(in oklab, var(--nw-peak) 45%, transparent); }
+.whc .tk { position:relative; white-space:nowrap; } .whc .tk span { position:absolute; top:0; transform:translateX(-50%); } .whc .tk span.l { left:0; transform:none; }
+.whl { margin-top:8px; justify-content:flex-start; }
+.whl i.ln { height:3px; width:14px; border-radius:2px; }
+.whl i.dsh { width:14px; height:0; border-top:2px dashed var(--nw-act); border-radius:0; background:none; }
+/* The next heatings: two short lines each, nothing cut. */
+.whn { display:grid; gap:10px; }
+.whn .r { display:grid; grid-template-columns:auto minmax(0, 1fr) auto; gap:4px 10px; align-items:center; }
+.whn .w, .whn .v { display:grid; } .whn .v { text-align:right; font-variant-numeric:tabular-nums; }
+.whn b { font-weight:600; font-size:var(--nw-fs-text); } .whn small { font-size:var(--nw-fs-small); color:var(--nw-fg2); }
+.whn .dot { width:10px; height:10px; border-radius:50%; background:var(--c); }
+/* Without Hestia against the plan, day by day. */
+.duo { display:grid; grid-template-columns:max-content minmax(0, 1fr) max-content; gap:10px 12px; align-items:center; font-size:var(--nw-fs-text); }
+.duo .t { display:grid; gap:3px; } .duo .t i { display:block; height:7px; border-radius:4px; }
+.duo .t .a { background:color-mix(in srgb, var(--nw-fg2) 55%, transparent); } .duo .t .b { background:var(--nw-water); }
+.duo .v { display:grid; text-align:right; font-variant-numeric:tabular-nums; line-height:1.2; } .duo .v small { color:var(--nw-fg2); font-size:var(--nw-fs-small); }
+.duo + .nw-legend { margin-top:8px; justify-content:flex-start; }
 .hb.list .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--c); margin-right:6px; vertical-align:1px; }
