@@ -438,3 +438,31 @@ def weather_hours(hass: HomeAssistant, place: str | None) -> list[dict]:
         out.append({"time": at if at.tzinfo else at.replace(tzinfo=dt_util.UTC), "cloud_coverage": hour.get("cloud_coverage"),
                     "condition": hour.get("condition")})
     return out
+
+
+# --- Hestia Heating's own cost of the heating (1.0.0b11, « un seul coût ») ------------------------------------------
+
+HEATING_API = "hestia_heating_api"
+HEATING_API_VERSION = 1
+_COST_KEYS = ("electrique_kwh", "electrique_eur", "granules_kg", "granules_eur", "chauffage_eur", "gagne_eur")
+
+
+def heating_cost(hass: HomeAssistant, day=None) -> dict | None:
+    """What the heating cost on a day, as Hestia Heating counts it (its interface v1, `cout_chauffage`, added in its
+    1.1.0b1): today so far when `day` is None, else one of the last 30 days. None without Hestia Heating, with an
+    older one, or without that day. Only numbers are kept: a part without a known price stays None."""
+    api = hass.data.get(HEATING_API)
+    if api is None or getattr(api, "version", None) != HEATING_API_VERSION or not hasattr(api, "cout_chauffage"):
+        return None
+    try:
+        found = api.cout_chauffage(day)
+    except Exception as err:  # noqa: BLE001 - another brick's trouble never stops this one
+        _LOGGER.debug("Hestia Heating's cost unavailable: %s", err)
+        return None
+    if not isinstance(found, dict):
+        return None
+    out = {k: (float(found[k]) if isinstance(found.get(k), (int, float)) and not isinstance(found.get(k), bool) else None)
+           for k in _COST_KEYS}
+    out["jour"] = str(found.get("jour") or (day.isoformat() if hasattr(day, "isoformat") else day or ""))
+    out["prix"] = found.get("prix") if found.get("prix") in ("energie", "reglages") else None
+    return out

@@ -92,7 +92,7 @@ Le format **Chauffe-eau** de la carte Hestia Énergie montre la réserve, la phr
 
 ```yaml
 type: custom:hestia-energy-card
-format: chauffe_eau
+card: chauffe_eau
 ```
 
 ## Pour les autres briques

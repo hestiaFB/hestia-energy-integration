@@ -23,7 +23,7 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
  mois:Period|null;projection:number|null;mois_an_dernier:Period|null;douze_mois:{euros:number|null;du:string;au:string;soleil_couvre:number|null;revendu_euros:number|null}|null;
  bilans:{id:string;titre:string;texte:string;euros:number|null;kwh:number}[];chauffage:{etat:string;mois?:{kwh:number;eur:number|null}|null;poele?:{saison?:{kg:number;eur:number|null}}|null}|null;
  eau:{mois_l:number;mois_euros:number|null}|null;sources:Source[];appareils:{liste:Device[];mois:string|null;part:number|null};extensions:Ext[];groupes:[string,string][];
- tarifs:string|null;notifie:boolean;chauffe_eau?:Heater|null;chauffe_eau_appareils?:{stat:string;nom:string}[];mis_a_jour?:string;technique?:Tech;pistes:{id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null}[]};
+ tarifs:string|null;notifie:boolean;cout_chauffage?:{mois:{chauffage_eur:number|null;electrique_eur:number|null;granules_eur:number|null;electrique_kwh:number|null;granules_kg:number|null;jours:number}}|null;chauffe_eau?:Heater|null;chauffe_eau_appareils?:{stat:string;nom:string}[];mis_a_jour?:string;technique?:Tech;pistes:{id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null}[]};
 /** The water heater driven by Hestia (1.0.0b11, chauffe_eau.py): what the card shows, and its settings. */
 type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
@@ -504,7 +504,11 @@ export class HestiaEnergySetup extends LitElement {
   const resale=ms.reduce((a,p)=>a+(p.revendu_euros??0),0),label=(p:Period)=>{const d=new Date(p.debut);return `${cap(MONTHS[d.getMonth()])} ${d.getFullYear()}`;};
   const first=label(ms[0]).toLowerCase(),final=label(ms[ms.length-1]).toLowerCase();
   const heat=h.chauffage,stove=heat?.poele?.saison,water=h.eau,sun=h.douze_mois?.soleil_couvre;
-  const heatRows=[...(heat?.etat==='pret'&&heat.mois?[listRow({label:`Électricité due au froid, depuis le 1er ${month}`,value:eur(heat.mois.eur),sub:`${kwh(heat.mois.kwh)}, estimés d’après le froid de chaque jour.`})]:[]),
+  const hc=h.cout_chauffage?.mois;
+  // With Hestia Chauffage 1.1 or later, its own cost of the heating, shown as it is (one cost, Frank on 26 Nov. 2026).
+  const heatRows=hc?[listRow({label:`Depuis le 1er ${month}`,value:eur(hc.chauffage_eur),sub:cap([hc.electrique_kwh?`Radiateurs ${hc.electrique_eur!=null?eur(hc.electrique_eur):kwh(hc.electrique_kwh)}`:'',
+    hc.granules_kg?`poêle ${hc.granules_eur!=null?eur(hc.granules_eur):num(hc.granules_kg)+' kg'}`:''].filter(Boolean).join(', ')+'. Compté par Hestia Chauffage.')})]
+   :[...(heat?.etat==='pret'&&heat.mois?[listRow({label:`Électricité due au froid, depuis le 1er ${month}`,value:eur(heat.mois.eur),sub:`${kwh(heat.mois.kwh)}, estimés d’après le froid de chaque jour.`})]:[]),
    ...(stove?[listRow({label:'Poêle, depuis la rentrée',value:eur(stove.eur),sub:`${num(stove.kg)} kg de granulés.`})]:[])];
   return html`${this.head('Bilan',{lead:'Ce mois-ci et les 12 derniers mois, abonnement compris',help:'Calculés avec les chiffres d’Enedis, qui font foi, et le prix de chaque jour. Un jour sans prix connu n’est jamais compté gratuit.'})}
    ${now}

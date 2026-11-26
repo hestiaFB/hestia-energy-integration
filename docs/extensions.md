@@ -12,6 +12,7 @@ Hestia Énergie fonctionne avec la seule page Énergie. Chaque extension install
 | Comwatt | Les appareils et les pinces mesurés en ligne |
 | [Versatile Thermostat](https://github.com/jmcollin78/versatile_thermostat) | Le chauffage en direct, pièce par pièce |
 | Suivi Stock Pellet | Les sacs de granulés achetés et brûlés : le poêle en euros |
+| [Hestia Chauffage](https://github.com/hestiaFB/hestia-heating-integration) (1.1 ou plus récent) | Un seul coût du chauffage : celui qu’elle compte (radiateurs et poêle), montré tel quel dans la carte Chauffage et le Bilan |
 
 Hestia Énergie ne commande aucune de ces extensions : elle les lit.
 

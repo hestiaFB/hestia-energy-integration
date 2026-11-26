@@ -45,7 +45,10 @@ type View={pret:boolean;palier:number;equipement:{direct?:boolean;soleil?:boolea
  appareils_jour?:{appareils:{nom:string;kwh:number;euros:number|null}[];mesure_kwh:number;maison_kwh:number;sans_prise_kwh:number|null;prix_moyen:number|null}|null;
  pointe?:{h:number;kw:number;part:number|null}|null;
  chauffage?:{etat:string;mois?:Heat|null;saison?:(Heat&{du:string})|null;euros_par_degre?:number|null;poele?:Stove|null};
- usage?:Usage|null;chauffe_eau?:Heater|null};
+ usage?:Usage|null;chauffe_eau?:Heater|null;cout_chauffage?:HeatCost|null};
+/** The heating's cost as Hestia Heating counts it (1.0.0b11, « un seul coût »): shown as it is, in place of Énergie's estimate. */
+type HeatDay={jour:string;electrique_kwh:number|null;electrique_eur:number|null;granules_kg:number|null;granules_eur:number|null;chauffage_eur:number|null;gagne_eur:number|null;prix:string|null};
+type HeatCost={aujourdhui:HeatDay;hier:HeatDay|null;mois:Omit<HeatDay,'jour'|'prix'>&{jours:number;du:string};par:string};
 /** The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md): its plan, its reserve, its mode. `courbe`: each
     half hour from now, [start, reserve %, sun to spare forecast kW, price, off-peak 1/0, the heating's source or null]. */
 type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
@@ -455,8 +458,10 @@ class HestiaEnergyCard extends LitElement {
   const j=v.jour;
   if(v.equipement.soleil&&j?.soleil_kwh!=null)out.push(this._go('soleil','sun','--nw-sun','Soleil · aujourd\'hui',kwh(j.soleil_kwh),'kWh produits',
    j.soleil_garde!=null?`La maison en a gardé ${j.soleil_garde} %.`:j.soleil_kwh>0?'Une partie de la production n\'a pas été mesurée.':'Rien encore aujourd\'hui.'));
-  const heat=this._heatSum(v);
-  if(heat)out.push(this._go('chauffage','flame','--nw-heat','Chauffage · depuis le 1er octobre',heat.val,heat.unit,heat.say));
+  const heat=this._heatSum(v),hc=v.cout_chauffage;
+  if(hc)out.push(this._go('chauffage','flame','--nw-heat','Chauffage · ce mois-ci',hc.mois.chauffage_eur!=null?eur(hc.mois.chauffage_eur):'—','€',
+   hc.aujourdhui.chauffage_eur!=null?`Aujourd'hui ${eur(hc.aujourdhui.chauffage_eur)} €, compté par Hestia Chauffage.`:'Compté par Hestia Chauffage.'));
+  else if(heat)out.push(this._go('chauffage','flame','--nw-heat','Chauffage · depuis le 1er octobre',heat.val,heat.unit,heat.say));
   if(v.veille)out.push(this._go('veille','moon','--nw-watch','Veille · chaque nuit',String(v.veille.w),'W quand tout dort',
    v.veille.euros_par_an!=null?`Environ ${year(v.veille.euros_par_an)} € par an.`:'Ce que tire la maison quand tout dort.'));
   const e=v.eau,leak=v.direct?.fuite?.minutes;
@@ -650,6 +655,7 @@ class HestiaEnergyCard extends LitElement {
  }
 
  private _heat(v:View,over:boolean){
+  if(v.cout_chauffage)return this._heatCost(v,v.cout_chauffage,over);
   const h=v.chauffage,st=h?.poele,stove=st?.saison,el=h?.etat==='pret'?h.saison:null,sum=this._heatSum(v);
   const head={ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'depuis le 1er octobre',over};
   const why:Record<string,string>={sans_meteo:'Pour estimer les radiateurs, Hestia a besoin du froid de chaque jour : ajoutez Hestia Météo.',
@@ -680,6 +686,29 @@ class HestiaEnergyCard extends LitElement {
    html`<div><div class="track" style="--c:var(--nw-heat)"><i style="width:${stove.kg+stock>0?stove.kg/(stove.kg+stock)*100:0}%"></i></div>
     <div class="track-l"><span>brûlés <b>${num(stove.kg,0)} kg</b></span><span>en stock <b>${num(stock,0)} kg</b></span></div></div>`):nothing;
   return html`${this._ans({...head,val,unit,cap,why:answer})}<div class="encs">${who}${cold}${pellets}</div>`;
+ }
+
+ /** With Hestia Chauffage 1.1 or later: one cost of the heating, its own, shown as it is (Frank, 26 Nov. 2026). The
+     pellets in stock stay Énergie's (Suivi Stock Pellet). */
+ private _heatCost(v:View,c:HeatCost,over:boolean){
+  const m=c.mois,t=c.aujourdhui,y=c.hier;
+  type Part={electrique_eur:number|null;granules_eur:number|null;electrique_kwh:number|null;granules_kg:number|null};
+  // « Radiateurs 1,20 €, poêle 2,10 €. » : each part that heated, in euros when its price is known.
+  const say=(d:Part,first=true)=>{const p=[...(d.electrique_kwh?[html`${first?'R':'r'}adiateurs <b>${d.electrique_eur!=null?`${eur(d.electrique_eur)} €`:`${kwh(d.electrique_kwh)} kWh`}</b>`]:[]),
+   ...(d.granules_kg?[html`${first&&!d.electrique_kwh?'P':'p'}oêle <b>${d.granules_eur!=null?`${eur(d.granules_eur)} €`:`${num(d.granules_kg,0)} kg`}</b>`]:[])];
+   return p.length?html`${p[0]}${p[1]?html`, ${p[1]}`:nothing}.`:nothing;};
+  const rows:Bar[]=[...(m.electrique_eur!=null&&m.electrique_kwh?[{n:'Radiateurs',v:m.electrique_eur,txt:`${eur(m.electrique_eur)} €`,sub:`${kwh(m.electrique_kwh)} kWh`}]:[]),
+   ...(m.granules_eur!=null&&m.granules_kg?[{n:'Poêle',v:m.granules_eur,txt:`${eur(m.granules_eur)} €`,sub:`${num(m.granules_kg,0)} kg`}]:[])];
+  const days=this._enc('Aujourd\'hui et hier',html`Aujourd'hui <b>${t.chauffage_eur!=null?`${eur(t.chauffage_eur)} €`:'—'}</b> : ${say(t,false)}${y?html` Hier <b>${y.chauffage_eur!=null?`${eur(y.chauffage_eur)} €`:'—'}</b> : ${say(y,false)}`:nothing}`,nothing);
+  const who=rows.length>1?this._enc('Qui chauffe',html`Ce mois-ci, ${say(m,false)}`,hb(rows,'--nw-heat')):nothing;
+  const won=m.gagne_eur!=null&&m.gagne_eur>0?this._enc('Le poêle fait gagner',html`Ce mois-ci, <b>${eur(m.gagne_eur)} €</b> de moins qu'avec la même chaleur à l'électricité.`,nothing):nothing;
+  const st=v.chauffage?.poele,stock=st?.stock_kg,bags=stock!=null&&st?.sac_kg?Math.round(stock/st.sac_kg*10)/10:null;
+  const pellets=stock!=null?this._enc('Granulés en stock',stock<=0?html`<b>Plus de granulés</b> en stock.`
+    :html`Il reste <b>${bags!=null?`${num(bags,1)} sac${bags>1?'s':''} (${num(stock,0)} kg)`:`${num(stock,0)} kg`}</b>${st?.jours_restants!=null?html` : <b>environ ${st.jours_restants} jours</b> de poêle`:''}.`,nothing):nothing;
+  const known=m.chauffage_eur!=null;
+  return html`${this._ans({ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'ce mois-ci',over,val:known?eur(m.chauffage_eur!):'—',unit:known?'€':'',cap:'pour se chauffer',
+    why:html`Compté par <b>Hestia Chauffage</b>, au prix de chaque heure${m.jours<new Date().getDate()?` (${m.jours} jours connus)`:''}.${known?'':' Une partie n\'a pas encore de prix connu.'}`})}
+   <div class="encs">${days}${who}${won}${pellets}</div>`;
  }
 
  private _night(v:View,over:boolean){
@@ -822,7 +851,7 @@ const MODE_W:Record<string,string>={simulation:'Simulation',automatique:'Automat
     (blocks by source), the price of each half hour (band), the hot-water times. */
 function heaterChart(w:Heater){
  const pts=w.courbe;if(pts.length<2)return nothing;
- const W=640,L=30,R=8,T=14,H=130,band=T+H+8,X=(i:number)=>L+(W-L-R)*i/pts.length,y=(p:number)=>T+H-Math.max(0,Math.min(100,p))/100*H;
+ const W=640,L=40,R=8,T=14,H=130,band=T+H+8,X=(i:number)=>L+(W-L-R)*i/pts.length,y=(p:number)=>T+H-Math.max(0,Math.min(100,p))/100*H;
  const sunMax=Math.max(3,...pts.map(p=>p[2])),ys=(k:number)=>T+H-k/sunMax*H*0.8;
  let area=`M${X(0)},${T+H}`;pts.forEach((p,i)=>{area+=` L${X(i)+(X(1)-X(0))/2},${ys(p[2])}`;});area+=` L${X(pts.length)},${T+H} Z`;
  let line='';pts.forEach((p,i)=>{line+=`${i?' L':'M'}${X(i)+(X(1)-X(0))/2},${y(p[1])}`;});

@@ -12,6 +12,8 @@
 - Un format **Chauffe-eau** pour la carte, avec le plan des prochaines heures dessiné à l’échelle.
 - Pour les autres briques : `water_heater()` dans l’interface v1 (un ajout, rien ne change pour Hestia Chauffage).
 
+- **Un seul coût du chauffage** : avec Hestia Chauffage 1.1 ou plus récente, la carte Chauffage et le Bilan montrent le coût du chauffage tel que Hestia Chauffage le compte (radiateurs au prix de chaque heure, poêle au prix de ses sacs) : aujourd’hui, hier et depuis le 1er du mois, avec ce que le poêle fait gagner. Énergie ne le recompte pas de son côté. Sans Hestia Chauffage, rien ne change : les radiateurs restent estimés d’après le froid.
+
 ### Améliorations
 
 - Quand le chauffe-eau est piloté par Hestia, le conseil « programmez le chauffe-eau » disparaît : il n’a plus lieu d’être.

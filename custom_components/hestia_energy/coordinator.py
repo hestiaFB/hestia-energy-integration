@@ -63,6 +63,25 @@ def _weather_updated() -> None:
     """Hestia Weather recomputed the place: nothing to do here (the cold is read at the hourly refresh)."""
 
 
+def heating_month_cost(hass, today) -> dict | None:
+    """Today, yesterday and the month from the 1st, from Hestia Heating's `cout_chauffage` (reader.heating_cost). A
+    month sum is None for a part when a day of it has no known price; `jours` says how many days Hestia Heating knew."""
+    now = reader.heating_cost(hass)
+    if now is None:
+        return None
+    days = [now]
+    for back in range(1, today.day):
+        found = reader.heating_cost(hass, today - timedelta(days=back))
+        if found is not None:
+            days.append(found)
+    month: dict = {"jours": len(days), "du": today.replace(day=1).isoformat()}
+    for key in ("electrique_kwh", "electrique_eur", "granules_kg", "granules_eur", "chauffage_eur", "gagne_eur"):
+        values = [d[key] for d in days]
+        month[key] = None if any(v is None for v in values) else round(sum(values), 2)
+    yesterday = reader.heating_cost(hass, today - timedelta(days=1))
+    return {"aujourdhui": now, "hier": yesterday, "mois": month, "par": "Hestia Chauffage"}
+
+
 class EnergyCoordinator:
     def __init__(self, hass: HomeAssistant, entry) -> None:
         self.hass = hass
@@ -413,6 +432,7 @@ class EnergyCoordinator:
         self.data.update(await self.hass.async_add_executor_job(self._reports, now, prices, export_price))
         await self.heater.async_forecast(now)
         self.heater.replan()
+        self._read_heating_cost(now)
         self.data["pret"] = True
 
     async def _fetch_colours(self, now: datetime) -> None:
@@ -862,6 +882,13 @@ class EnergyCoordinator:
             return None
         return live.Candidate("Onduleurs (OpenDTU)", [(reading, 1)], local=self.locality.get(reading.entity_id))
 
+    def _read_heating_cost(self, now: datetime) -> None:
+        """The heating's cost as Hestia Heating counts it (1.0.0b11, « un seul coût » : shown as it is, never counted a
+        second time here): today so far, yesterday, and the month from the 1st. Read from its memory, every 10 minutes
+        (it counts today's every 10 minutes). None without Hestia Heating 1.1 or later."""
+        self._heating_cost_at = now
+        self.data["cout_chauffage"] = heating_month_cost(self.hass, now.astimezone(self.tz).date())
+
     @callback
     def _update_live(self) -> None:
         if not self.page or not self.data.get("pret"):
@@ -945,6 +972,8 @@ class EnergyCoordinator:
             "chauffage": None if heat_now is None else heat_now.as_dict(price),
             "bandeau": banner, "sources": {k: _verdict(v) for k, v in verdicts.items()}, "a": now.isoformat(),
         }
+        if now - getattr(self, "_heating_cost_at", now - timedelta(hours=1)) >= timedelta(minutes=10):
+            self._read_heating_cost(now)
         try:
             self.data["chauffe_eau"] = self.heater.update(now)
         except Exception:  # noqa: BLE001 - the water heater's trouble never stops the rest of the brick

@@ -569,6 +569,8 @@ def build(hass, c) -> dict:
         # advice « à froid » (engine/daily.py): shown in « À améliorer » with the euros at stake
         "pistes": d.get("pistes") or [],
         "chauffage": d.get("chauffage"), "eau": d.get("eau"),
+        # The heating's cost as Hestia Heating counts it (1.0.0b11): shown as it is, in place of the estimate.
+        "cout_chauffage": d.get("cout_chauffage"),
         "sources": build_sources(hass, c), "appareils": devices,
         "extensions": build_extensions(hass, c, devices["liste"]),
         "technique": technical(hass, c, devices["liste"]),

@@ -20,7 +20,7 @@ VIEW_VERSION = 1
 # out of their view (33 kB → about 10 kB; audit of 9 Nov. 2026).
 CARD_KEYS = ("pret", "palier", "equipement", "direct", "jour", "hier", "mois", "mois_an_dernier", "projection", "jusqu_ici",
              "dernier_jour", "pistes", "veille", "veille_historique", "heures_creuses", "contrat", "heures", "eau",
-             "chauffage", "panneaux", "soleil_jour", "appareils_jour", "pointe", "usage", "chauffe_eau")
+             "chauffage", "panneaux", "soleil_jour", "appareils_jour", "pointe", "usage", "chauffe_eau", "cout_chauffage")
 
 
 def _coordinator(hass):
@@ -120,7 +120,7 @@ def ws_detail(hass, connection, msg):
     elif rubrique == "chauffe_eau":
         out = {"chauffe_eau": d.get("chauffe_eau")}
     else:
-        out = {"chauffage": d.get("chauffage")}
+        out = {"chauffage": d.get("chauffage"), "cout_chauffage": d.get("cout_chauffage")}
     connection.send_result(msg["id"], {"rubrique": rubrique, **out})
 
 
