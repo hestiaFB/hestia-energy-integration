@@ -6,7 +6,8 @@ from types import SimpleNamespace
 import unittest
 from zoneinfo import ZoneInfo
 
-sys.path.insert(0, str(Path(__file__).resolve().parents[1] / "custom_components" / "hestia_energy"))
+# At the end of the path: the brick's own select.py must never hide the standard library's select.
+sys.path.append(str(Path(__file__).resolve().parents[1] / "custom_components" / "hestia_energy"))
 
 from engine import advice, phrases, tariff  # noqa: E402
 from engine.sources import EnergyPage, Meter  # noqa: E402

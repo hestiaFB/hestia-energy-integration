@@ -16,7 +16,8 @@ import sys
 import unittest
 
 ROOT = Path(__file__).resolve().parents[1]
-sys.path.insert(0, str(ROOT / "custom_components" / "hestia_energy"))
+# At the end of the path: the brick's own select.py must never hide the standard library's select.
+sys.path.append(str(ROOT / "custom_components" / "hestia_energy"))
 DATA = Path(os.environ.get("HESTIA_ENERGY_DATA", ROOT.parent / "hestia-energie" / "donnees-test"))
 HOME = DATA / "maison-frank"
 LEVEL0 = DATA / "palier-0"
