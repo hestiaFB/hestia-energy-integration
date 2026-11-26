@@ -2,7 +2,7 @@
 
 ### Améliorations
 
-- Page Chauffe-eau : « Les heures où l’on en a besoin » devient « Quand on tire l’eau chaude ». La page dit maintenant que ce sont des moments (« vers 6 h 30 »), pas des plages horaires : le ballon est assez chaud avant chacun, et l’eau du jour est partagée entre eux. Les moments se rangent dans l’ordre de la journée.
+- Chauffe-eau : les moments d’eau chaude deviennent des **plages** (par défaut de 6 h à 9 h et de 19 h à 23 h), réglées dans la page Chauffe-eau sous « Quand on tire l’eau chaude ». On ne sait jamais à la minute quand on prend sa douche : le ballon est assez chaud dès le début de chaque plage, et l’eau du jour est tirée tout au long de la plage. Une heure seule, réglée avant, compte comme une plage d’une heure.
 
 ## 1.0.1b2 — Choisir la prise et la sonde du chauffe-eau
 

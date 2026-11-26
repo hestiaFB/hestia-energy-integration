@@ -218,6 +218,28 @@ class Learning(unittest.TestCase):
     def test_hot_water_times(self):
         self.assertEqual(w.parse_hours(["20:00", "7h", "x", "07:00"]), [420, 1200])
 
+    def test_hot_water_ranges(self):
+        """Ranges since 1.0.1b3 (Frank: when the household draws is never exact); a time alone stays an hour."""
+        self.assertEqual(w.parse_ranges(["19:00-23:00", "06:00-09:00", "07:30", "x", "8:00-8:00", "22:00-01:00"]),
+                         [(360, 180), (450, 60), (1140, 240), (1320, 180)])
+        self.assertEqual(w.parse_hours(["06:00-09:00", "19:00-23:00"]), [360, 1140])
+
+    def test_a_range_draws_evenly_across_it(self):
+        ranges = w.parse_ranges(["06:00-09:00", "19:00-23:00"])
+        losses = 7.0 * 0.25 / 24
+        self.assertAlmostEqual(w.draw_kw(at(26, 7), 7.0, ranges) - losses, 7.0 * 0.75 / 2 / 3)
+        self.assertAlmostEqual(w.draw_kw(at(26, 22, 59), 7.0, ranges) - losses, 7.0 * 0.75 / 2 / 4)
+        self.assertAlmostEqual(w.draw_kw(at(26, 12), 7.0, ranges), losses)
+        day = sum(w.draw_kw(at(26, 0) + timedelta(minutes=m), 7.0, ranges) for m in range(1440)) / 60
+        self.assertAlmostEqual(day, 7.0, places=2)
+
+    def test_the_tank_is_ready_before_the_evening_range(self):
+        ranges = w.parse_ranges(["06:00-09:00", "19:00-23:00"])
+        slots = w.build_slots(at(26, 18), PARIS, lambda m: HC if offpeak(m) else HP, offpeak, lambda m: None, LEARNED,
+                              lambda d: 7.0, ranges)
+        p = w.make_plan(slots, 4.0, w.Settings(10, 2.4, 3.0, RESALE, 5.4))
+        self.assertIsNone(p.short_at)
+
 
 if __name__ == "__main__":
     unittest.main()

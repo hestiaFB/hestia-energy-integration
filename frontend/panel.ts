@@ -376,8 +376,12 @@ export class HestiaEnergySetup extends LitElement {
    :select(k,l,list.map(id=>[id,label(id)]),'Aucune');
   const numIn=(k:'litres'|'puissance_w'|'consigne',l:string,unit:string,step:number,ph:string)=>html`<input type="number" step=${step} min="0" aria-label=${l} placeholder=${ph}
     .value=${s[k]!=null?String(s[k]):''} @change=${(e:Event)=>{const v=(e.target as HTMLInputElement).value;this.setHeater(k,v===''?null:Number(v));}}><span class="nk-unit">${unit}</span>`;
-  const hours=s.heures??['07:00','20:00'];
-  const setHours=(l:string[])=>this.setHeater('heures',l.filter(Boolean).sort());
+  // Ranges (« 06:00-09:00 », Frank on 26 Nov. 2026); a time alone, kept before 1.0.1b3, is shown as an hour from it.
+  const pad=(m:number)=>`${String(Math.floor(m/60)%24).padStart(2,'0')}:${String(m%60).padStart(2,'0')}`;
+  const toRange=(x:string):[string,string]=>{const [a,b]=x.split('-');if(b)return [a,b];const [h,m]=a.split(':').map(Number);return [a,pad(h*60+(m||0)+60)];};
+  const hours=(s.heures??['06:00-09:00','19:00-23:00']).map(toRange);
+  const setHours=(l:[string,string][])=>this.setHeater('heures',l.filter(([a,b])=>a&&b&&a!==b).map(([a,b])=>`${a}-${b}`).sort());
+  const hourIn=(i:number,j:0|1)=>html`<input type="time" aria-label=${`${j?'Fin':'Début'} de la plage ${i+1}`} .value=${hours[i][j]} @change=${(e:Event)=>{const l=hours.map(r=>[...r] as [string,string]);l[i][j]=(e.target as HTMLInputElement).value;setHours(l);}}>`;
   const when=(iso:string)=>{const d=new Date(iso),today=new Date(),tomorrow=new Date();tomorrow.setDate(today.getDate()+1);
    return d.toDateString()===today.toDateString()?hm(d):d.toDateString()===tomorrow.toDateString()?`demain ${hm(d)}`:`${DAYS[d.getDay()]} ${hm(d)}`;};
   const missing:Record<string,[string,string]>={appareil:['Choisissez le chauffe-eau','Parmi les appareils de la page Énergie, ou indiquez sa prise et sa puissance.'],
@@ -408,12 +412,12 @@ export class HestiaEnergySetup extends LitElement {
     ...(s.sonde?[listRow({label:'Sa température de consigne',control:true,value:numIn('consigne','Sa température de consigne','°C',1,'60')})]:[]),
    ],{help:'Laissés vides, la puissance et le besoin s’apprennent sur les 4 dernières semaines de mesures.'})}
    ${listSection('L’eau chaude',[
-    // Moments, not a range (Frank, 26 Nov. 2026): the household draws hot water around each one; the tank is hot before.
+    // Ranges (Frank, 26 Nov. 2026): when the household draws is never exact. The tank is hot from the start of each.
     listRow({label:'Quand on tire l’eau chaude',control:true,
-     sub:html`Les douches et les bains : une heure par moment, pas une plage. Le chauffe-eau est assez chaud <b>avant</b> chacune ; l’eau du jour${w?.besoin_kwh?` (${kwh(w.besoin_kwh)})`:''} est partagée entre elles.`,
-     value:html`<span class="hc">${hours.map((x,i)=>html`<span><span class="nk-unit">vers</span><input type="time" aria-label=${'Moment '+(i+1)} .value=${x} @change=${(e:Event)=>{const l=[...hours];l[i]=(e.target as HTMLInputElement).value;setHours(l);}}>
+     sub:html`Les plages des douches et des bains. Le chauffe-eau est assez chaud <b>dès le début</b> de chacune ; l’eau du jour${w?.besoin_kwh?` (${kwh(w.besoin_kwh)})`:''} est partagée entre elles, tout au long de la plage.`,
+     value:html`<span class="hc">${hours.map((_,i)=>html`<span>${hourIn(i,0)}<span class="nk-unit">à</span>${hourIn(i,1)}
       ${hours.length>1?html`<button type="button" class="nk-reset-s" @click=${()=>{const l=[...hours];l.splice(i,1);setHours(l);}}>Retirer</button>`:nothing}</span>`)}</span>`}),
-    ...(hours.length<6?[listRow({label:'Ajouter un moment',go:()=>setHours([...hours,'12:00'])})]:[]),
+    ...(hours.length<6?[listRow({label:'Ajouter une plage',go:()=>setHours([...hours,['12:00','14:00']])})]:[]),
     listRow({label:'Garder au moins',control:true,sub:'La réserve sous laquelle Hestia chauffe tout de suite, même en heures pleines.',
      value:html`<select aria-label="Garder au moins" @change=${(e:Event)=>this.setHeater('reserve_min',Number((e.target as HTMLSelectElement).value)/100)}>${[10,20,30,40,50,60].map(v=>html`<option value=${v} ?selected=${Math.round((s.reserve_min??0.3)*100)===v}>${v} %</option>`)}</select>`}),
     listRow({label:'Démarrages par jour, au plus',control:true,sub:'Pour ménager la résistance et le relais de la prise.',

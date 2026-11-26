@@ -32,11 +32,11 @@ SIMULATION, AUTO, OFFPEAK, AWAY = "simulation", "automatique", "heures_creuses",
 MODES = (SIMULATION, AUTO, OFFPEAK, AWAY)
 # The settings of the water heater, with their defaults (a setting, never a constant, when it depends on the home).
 DEFAULTS = {"mode": SIMULATION, "appareil": None, "prise": None, "sonde": None, "litres": None, "puissance_w": None,
-            "heures": ["07:00", "20:00"], "reserve_min": 0.3, "demarrages": 4, "consigne": 60}
+            "heures": ["06:00-09:00", "19:00-23:00"], "reserve_min": 0.3, "demarrages": 4, "consigne": 60}
 KWH_PER_LITRE_K = 4.186 / 3600     # heating one litre by one degree
 COLD_WATER = 15                    # °C of the water coming in
 LOSS_SHARE = 0.25                  # of the day's need, the tank's losses, spread over the whole day
-DRAW_HOURS = 1.0                   # each hot-water time draws over this long
+DRAW_HOURS = 1.0                   # a hot-water time given alone (« 07:00 ») draws over this long
 HYGIENE_DAYS = 7                   # a full heating at least once a week (the tank's thermostat cut reached)
 LEARN_DAYS = 28
 MIN_DAYS = 7
@@ -182,29 +182,54 @@ def reserve_from_temperature(temp: float | None, setpoint: float, capacity: floa
     return max(0.0, min(capacity, capacity * (temp - COLD_WATER) / (setpoint - COLD_WATER)))
 
 
-def parse_hours(values) -> list[int]:
-    """The hot-water times (« 07:00 ») in minutes after midnight, in order; wrong ones left out."""
-    out = []
+def _minute(text: str) -> int | None:
+    try:
+        h, m = str(text).strip().replace("h", ":").split(":")
+        minute = int(h) * 60 + int(m or 0)
+    except ValueError:
+        return None
+    return minute if 0 <= minute < 1440 else None
+
+
+def parse_ranges(values) -> list[tuple[int, int]]:
+    """The hot-water ranges (« 06:00-09:00 », Frank on 26 Nov. 2026: when the household draws is never exact) as
+    (start, length) in minutes, in order; a time alone (« 07:00 », before 1.0.1b3) is an hour from it. Wrong ones
+    left out; a range over midnight (« 22:00-01:00 ») is kept."""
+    out = set()
     for text in values or []:
-        try:
-            h, m = str(text).replace("h", ":").split(":")
-            minute = int(h) * 60 + int(m or 0)
-        except ValueError:
+        parts = str(text).split("-")
+        start = _minute(parts[0])
+        if start is None or len(parts) > 2:
             continue
-        if 0 <= minute < 1440:
-            out.append(minute)
-    return sorted(set(out))
+        if len(parts) == 1:
+            out.add((start, int(DRAW_HOURS * 60)))
+            continue
+        end = _minute(parts[1])
+        if end is None or end == start:
+            continue
+        out.add((start, (end - start) % 1440))
+    return sorted(out)
 
 
-def draw_kw(local: datetime, need_kwh: float, times: list[int]) -> float:
-    """What the household draws at that instant (kW): the losses all day long, and the rest over an hour after each
-    hot-water time, shared out equally."""
+def parse_hours(values) -> list[int]:
+    """The start of each hot-water range, in minutes after midnight, in order."""
+    return sorted({start for start, _ in parse_ranges(values)})
+
+
+def _as_ranges(times) -> list[tuple[int, int]]:
+    return [t if isinstance(t, tuple) else (int(t), int(DRAW_HOURS * 60)) for t in times]
+
+
+def draw_kw(local: datetime, need_kwh: float, times) -> float:
+    """What the household draws at that instant (kW): the losses all day long, and the rest spread evenly over each
+    hot-water range, shared out equally between the ranges. `times`: ranges (start, length) or starts alone."""
     losses = need_kwh * LOSS_SHARE / 24
-    if not times:
+    ranges = _as_ranges(times)
+    if not ranges:
         return need_kwh / 24
     minute = local.hour * 60 + local.minute
-    drawing = any(0 <= (minute - t) % 1440 < DRAW_HOURS * 60 for t in times)
-    return losses + (need_kwh * (1 - LOSS_SHARE) / len(times) / DRAW_HOURS if drawing else 0.0)
+    share = need_kwh * (1 - LOSS_SHARE) / len(ranges)
+    return losses + sum(share / (length / 60) for start, length in ranges if 0 <= (minute - start) % 1440 < length)
 
 
 # --- the reserve, followed minute by minute ---------------------------------------------------------------------
