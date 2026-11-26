@@ -9,6 +9,8 @@
 
 - Chauffe-eau : les moments d’eau chaude deviennent des **plages** (par défaut de 6 h à 9 h et de 19 h à 23 h), réglées dans la page Chauffe-eau sous « Quand on tire l’eau chaude ». On ne sait jamais à la minute quand on prend sa douche : le ballon est assez chaud dès le début de chaque plage, et l’eau du jour est tirée tout au long de la plage. Une heure seule, réglée avant, compte comme une plage d’une heure.
 
+- Carte Chauffe-eau refaite : le graphique se lit à toutes les largeurs (les textes gardent leur taille, plus rien ne se chevauche), les plages d’eau chaude sont des bandes, et la légende dit tout, ligne pointillée « jamais sous 30 % » comprise. Les prochaines chauffes tiennent sur deux lignes sans texte coupé (« demain, 14 h – 14 h 45 », « en partie au soleil »). Le bilan dit clairement « sans Hestia » et « avec le plan », jour par jour, avec l’écart en euros.
+
 ### Corrections
 
 - La charge de la batterie n’est plus comptée dans « Maison » : avec 735 W de soleil et 449 W qui vont dans la batterie, la maison consomme 286 W, plus 735 W.

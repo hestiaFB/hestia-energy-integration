@@ -830,17 +830,24 @@ class HestiaEnergyCard extends LitElement {
   const pill:[string,string]=w.simulation?['Simulation : rien n’est commandé','--nw-watch']:w.chauffer?['Chauffe','--nw-act']:w.raison==='plein'?['Plein','--nw-benefit']:['En attente','--nw-cold'];
   const runs=w.plan.slice(0,5);
   const sun=w.soleil_prevu==='prevision'?'la prévision solaire de la page Énergie':w.soleil_prevu==='nuages'?'les nuages prévus par Hestia Météo':w.soleil_prevu==='habitude'?'la production habituelle des panneaux':null;
-  const plan=this._enc('Le plan',sun?html`Refait toutes les 5 minutes, avec ${sun} et vos prix.`:'Refait toutes les 5 minutes, avec vos prix.',heaterChart(w),{wide:true,
-   foot:w.kwh_prevus!=null?html`Prévu : <b>${kwh(w.kwh_prevus)} kWh</b>${w.cout_prevu!=null?html`, <b>${eur(w.cout_prevu)} €</b>`:''} d'ici demain soir.`:nothing});
-  const next=runs.length?this._enc('Les prochaines chauffes',nothing,html`<div class="hb list">${runs.map(r=>html`<span class="n"><i class="dot" style="--c:var(${SOURCE_C[r.source]??'--nw-home'})"></i>${clock(new Date(r.debut))} – ${clock(new Date(r.fin))}<small>${SOURCE_W[r.source]??''}</small></span>
-    <span class="v">${kwh(r.kwh)} kWh<small>${eur(r.euros)} €</small></span>`)}</div>`):nothing;
+  const plan=this._enc('Le plan des prochaines heures',sun?html`Refait toutes les 5 minutes, avec ${sun} et vos prix.`:'Refait toutes les 5 minutes, avec vos prix.',heaterChart(w),{wide:true,
+   foot:w.kwh_prevus!=null?html`Prévu d'ici demain soir : <b>${kwh(w.kwh_prevus)} kWh</b>${w.cout_prevu!=null?html`, soit <b>${eur(w.cout_prevu)} €</b>`:''}.`:nothing});
+  // One heating per row, never cut: when and how on the left, the price and the energy on the right.
+  const next=runs.length?this._enc('Les prochaines chauffes',nothing,html`<div class="whn">${runs.map(r=>html`<div class="r">
+    <i class="dot" style="--c:var(${SOURCE_C[r.source]??'--nw-home'})"></i>
+    <div class="w"><b>${span(r.debut,r.fin)}</b><small>${SOURCE_W[r.source]??''}</small></div>
+    <div class="v"><b>${eur(r.euros)} €</b><small>${kwh(r.kwh)} kWh</small></div></div>`)}</div>`):nothing;
   const days=w.bilan.filter(d=>d.reel_kwh>=0.05||d.hestia_kwh>=0.05);
   const real=days.reduce((s,d)=>s+d.reel_eur,0),hestia=days.reduce((s,d)=>s+d.hestia_eur,0),hc=days.reduce((s,d)=>s+d.hc_eur,0);
-  const review=days.length?this._enc(`Les ${days.length} dernier${days.length>1?'s':''} jour${days.length>1?'s':''}`,w.simulation
-    ?html`Votre chauffe-eau a coûté <b>${eur(real)} €</b>. En suivant le plan, il aurait coûté <b>${eur(hestia)} €</b>.`
-    :html`Avec le plan, <b>${eur(hestia)} €</b>. En heures creuses simples, la même eau aurait coûté <b>${eur(hc)} €</b>.`,
-    hb(days.map(d=>({n:dayMonth(d.jour),v:w.simulation?Math.max(d.reel_eur,d.hestia_eur):d.hestia_eur,txt:`${eur(d.hestia_eur)} €`,
-      sub:w.simulation?`réel ${eur(d.reel_eur)} €`:`${kwh(d.hestia_kwh)} kWh`})),'--nw-water'),{foot:w.simulation?'Le plan est calculé sur la même maison, minute par minute : rien n’a été commandé.':nothing}):nothing;
+  // Without Hestia (what was paid, or « off-peak only ») against the plan, day by day.
+  const ref=w.simulation?real:hc,diff=ref-hestia,n=days.length,today=isoDay(new Date());
+  const refW=w.simulation?'sans Hestia (ce que vous avez payé)':'en heures creuses seules';
+  const review=n?this._enc(w.simulation?'Ce que le plan aurait coûté':'Ce que le plan a coûté',w.simulation
+    ?html`Sans Hestia, votre chauffe-eau a coûté <b>${eur(real)} €</b>. Avec le plan, il aurait coûté <b>${eur(hestia)} €</b>${Math.abs(diff)>=0.005?html` : <b>${eur(Math.abs(diff))} € de ${diff>0?'moins':'plus'}</b>`:''}.`
+    :html`Avec le plan, <b>${eur(hestia)} €</b>. En heures creuses seules, la même eau aurait coûté <b>${eur(hc)} €</b>${Math.abs(diff)>=0.005?html` : <b>${eur(Math.abs(diff))} € de ${diff>0?'plus':'moins'}</b>`:''}.`,
+    html`${duo(days.map(d=>({n:d.jour===today?'aujourd’hui':dayMonth(d.jour),a:w.simulation?d.reel_eur:d.hc_eur,b:d.hestia_eur})))}
+     <div class="nw-legend"><span><i style="--c:var(--nw-fg2)"></i>${refW}</span><span><i style="--c:var(--nw-water)"></i>avec le plan de Hestia</span></div>`,
+    {aside:`sur ${n} jour${n>1?'s':''}`,foot:w.simulation?'Le plan est rejoué sur la même eau chaude, minute par minute : rien n’a été commandé.':nothing}):nothing;
   const todo:string[]=[];
   if(w.manque.includes('litres'))todo.push('le volume du ballon, pour une réserve juste');
   if(w.manque.includes('prise'))todo.push('la prise qui le commande');
@@ -898,32 +905,71 @@ const SOURCE_C:Record<string,string>={soleil:'--nw-sun',soleil_partiel:'--nw-act
 const SOURCE_W:Record<string,string>={soleil:'au soleil',soleil_partiel:'en partie au soleil',heures_creuses:'en heures creuses',heures_pleines:'en heures pleines',base:'au prix de base'};
 const MODE_W:Record<string,string>={simulation:'Simulation',automatique:'Automatique',heures_creuses:'Heures creuses seules',vacances:'Vacances'};
 
-/** The plan of the next hours, drawn to scale: the reserve (line), the sun to spare forecast (area), the heatings
-    (blocks by source), the price of each half hour (band), the hot-water times. */
+/** « 22 h », « 22 h 30 »: a clock without the useless « 00 ». */
+const hmd=(d:Date)=>d.getMinutes()?clock(d):hour(d.getHours());
+const isoDay=(d:Date)=>`${d.getFullYear()}-${String(d.getMonth()+1).padStart(2,'0')}-${String(d.getDate()).padStart(2,'0')}`;
+/** A heating's time, with its day when it is not today: « demain, 13 h – 13 h 45 ». */
+function span(a:string,b:string){
+ const x=new Date(a),y=new Date(b),now=new Date(),t=new Date(now);t.setDate(t.getDate()+1);
+ const day=isoDay(x)===isoDay(now)?'':isoDay(x)===isoDay(t)?'demain, ':`le ${dayMonth(isoDay(x))}, `;
+ return `${day}${hmd(x)} – ${hmd(y)}`;
+}
+/** Two bars a day, one above the other: the reference (grey) and the plan (water). */
+function duo(rows:{n:string;a:number;b:number}[]):TemplateResult{
+ const top=Math.max(...rows.flatMap(r=>[r.a,r.b]),0)||1,w=(x:number)=>`${Math.max(1,x/top*100)}%`;
+ return html`<div class="duo">${rows.map(r=>html`<span class="n">${r.n}</span>
+  <span class="t"><i class="a" style="width:${w(r.a)}"></i><i class="b" style="width:${w(r.b)}"></i></span>
+  <span class="v"><small>${eur(r.a)} €</small><b>${eur(r.b)} €</b></span>`)}</div>`;
+}
+/** The ranges of indices [start, end) where test is true, for bands and blocks drawn in one piece. */
+function runsOf<T>(pts:T[],key:(p:T)=>string|null):[number,number,string][]{
+ const out:[number,number,string][]=[];
+ pts.forEach((p,i)=>{const k=key(p);if(k==null)return;const last=out[out.length-1];if(last&&last[1]===i&&last[2]===k)last[1]=i+1;else out.push([i,i+1,k]);});
+ return out;
+}
+
+/** The plan of the next hours, drawn to scale: the reserve (line), the reserve kept at least (dashed), the sun to spare
+    forecast (area), the heatings (blocks by source), the hot-water ranges (bands), the price of each half hour (strip).
+    The shapes stretch with the card; every word is HTML at a fixed size, so it reads the same at any width. */
 function heaterChart(w:Heater){
- const pts=w.courbe;if(pts.length<2)return nothing;
- const W=640,L=40,R=8,T=14,H=130,band=T+H+8,X=(i:number)=>L+(W-L-R)*i/pts.length,y=(p:number)=>T+H-Math.max(0,Math.min(100,p))/100*H;
- const sunMax=Math.max(3,...pts.map(p=>p[2])),ys=(k:number)=>T+H-k/sunMax*H*0.8;
- let area=`M${X(0)},${T+H}`;pts.forEach((p,i)=>{area+=` L${X(i)+(X(1)-X(0))/2},${ys(p[2])}`;});area+=` L${X(pts.length)},${T+H} Z`;
- let line='';pts.forEach((p,i)=>{line+=`${i?' L':'M'}${X(i)+(X(1)-X(0))/2},${y(p[1])}`;});
- const ticks:TemplateResult[]=[],marks:TemplateResult[]=[];
- pts.forEach((p,i)=>{const d=new Date(p[0]),m=d.getHours()*60+d.getMinutes();
-  if(m%360===0)ticks.push(svg`<text x=${X(i)} y=${band+22} text-anchor="middle" class="tk">${m===0?'minuit':hour(d.getHours())}</text>`);
-  // The hot-water ranges (1.0.1b3), lightly shaded behind the curve.
-  if((w.plages??[]).some(([a,b])=>(m-a+1440)%1440<(b-a+1440)%1440))marks.push(svg`<rect x=${X(i)} y=${T} width=${X(i+1)-X(i)+.5} height=${H} class="hwr"></rect>`);
-  if(w.heures.some(t=>t>=m&&t<m+30))marks.push(svg`<line x1=${X(i)} x2=${X(i)} y1=${T} y2=${T+H} class="hw"></line><text x=${X(i)+3} y=${T+9} class="hwl">eau chaude</text>`);});
- const sunny=pts.some(p=>p[2]>0.05);
- return html`<svg class="whc" viewBox="0 0 ${W} ${band+28}" role="img" aria-label="Le plan des prochaines heures : réserve d'eau chaude, soleil prévu et chauffes">
-  ${[0,50,100].map(p=>svg`<line x1=${L} x2=${W-R} y1=${y(p)} y2=${y(p)} class="gl"></line><text x=${L-5} y=${y(p)+3} text-anchor="end" class="tk">${p} %</text>`)}
-  ${sunny?svg`<path d=${area} class="sun"></path>`:nothing}
-  ${marks}
-  <line x1=${L} x2=${W-R} y1=${y(w.reserve_min*100)} y2=${y(w.reserve_min*100)} class="min"></line>
-  ${pts.map((p,i)=>p[5]?svg`<rect x=${X(i)+.5} y=${T+H-18} width=${X(1)-X(0)-1} height="18" rx="2" style="fill:var(${SOURCE_C[p[5]]??'--nw-home'})"></rect>`:nothing)}
-  <path d=${line} class="res"></path>
-  ${pts.map((p,i)=>svg`<rect x=${X(i)} y=${band} width=${X(1)-X(0)+.3} height="7" class="pb" style="fill:var(${p[4]?'--nw-cold':'--nw-peak'})"></rect>`)}
-  ${ticks}<text x=${L} y=${T-4} class="tk">maintenant</text></svg>
-  <div class="nw-legend"><span><i style="--c:var(--nw-water)"></i>réserve d'eau chaude</span>${sunny?html`<span><i style="--c:color-mix(in oklab, var(--nw-sun) 45%, transparent)"></i>soleil en trop prévu</span>`:nothing}
-   <span><i style="--c:var(--nw-sun)"></i>chauffe au soleil</span><span><i style="--c:var(--nw-cold)"></i>en heures creuses</span><span><i style="--c:var(--nw-peak)"></i>en heures pleines</span></div>`;
+ const pts=w.courbe,n=pts.length;if(n<2)return nothing;
+ const pc=(i:number)=>`${i/n*100}%`,Y=(p:number)=>100-Math.max(0,Math.min(100,p));
+ const sunMax=Math.max(3,...pts.map(p=>p[2])),sunny=pts.some(p=>p[2]>0.05);
+ let area=`M0,100`;pts.forEach((p,i)=>{area+=` L${i+.5},${100-p[2]/sunMax*80}`;});area+=` L${n},100 Z`;
+ let line='';pts.forEach((p,i)=>{line+=`${i?' L':'M'}${i+.5},${Y(p[1])}`;});
+ const mins=(p:typeof pts[number])=>{const d=new Date(p[0]);return d.getHours()*60+d.getMinutes();};
+ const plages=w.plages??[],inRange=(m:number)=>plages.some(([a,b])=>(m-a+1440)%1440<(b-a+1440)%1440);
+ const bands=runsOf(pts,p=>inRange(mins(p))?'x':null),heats=runsOf(pts,p=>p[5]),prices=runsOf(pts,p=>p[4]?'hc':'hp');
+ // Hour marks every 6 hours, away from « maintenant » and from the right edge.
+ const ticks=pts.map((p,i)=>[i,mins(p)] as const).filter(([i,m])=>m%360===0&&i>=Math.max(4,n*.17)&&i<=n-3);
+ const used=new Set(pts.map(p=>p[5]).filter(Boolean) as string[]);
+ const minP=Math.round(w.reserve_min*100);
+ const rangesW=plages.map(([a,b])=>`${hm(a)} – ${hm(b)}`).join(', ');
+ return html`<div class="whc" role="img" aria-label="Le plan des prochaines heures : réserve d'eau chaude, soleil prévu et chauffes">
+   <div class="ya"><span class="t" style="top:0">100 %</span><span style="top:50%">50 %</span><span class="b" style="top:100%">0 %</span></div>
+   <div class="plot">
+    <svg viewBox="0 0 ${n} 100" preserveAspectRatio="none" aria-hidden="true">
+     ${bands.map(([a,b])=>svg`<rect x=${a} y="0" width=${b-a} height="100" class="hwr"></rect>`)}
+     ${[0,50,100].map(p=>svg`<line x1="0" x2=${n} y1=${Y(p)} y2=${Y(p)} class="gl"></line>`)}
+     ${sunny?svg`<path d=${area} class="sun"></path>`:nothing}
+     ${heats.map(([a,b,k])=>svg`<rect x=${a+.08} y="86" width=${b-a-.16} height="14" style="fill:var(${SOURCE_C[k]??'--nw-home'})"></rect>`)}
+     <line x1="0" x2=${n} y1=${Y(minP)} y2=${Y(minP)} class="min"></line>
+     <path d=${line} class="res"></path>
+    </svg>
+   </div>
+   <div class="yl">prix</div>
+   <div class="pb">${prices.map(([a,b,k])=>html`<i class=${k} style="left:${pc(a)};width:${pc(b-a)}"></i>`)}</div>
+   <div></div>
+   <div class="tk"><span class="l">maintenant</span>${ticks.map(([i,m])=>html`<span style="left:${pc(i)}">${m===0?'minuit':hour(m/60)}</span>`)}</div>
+  </div>
+  <div class="nw-legend whl">
+   <span><i class="ln" style="--c:var(--nw-water)"></i>eau chaude en réserve</span>
+   <span><i class="dsh"></i>jamais sous ${minP} %</span>
+   ${plages.length?html`<span><i style="--c:color-mix(in oklab, var(--nw-water) 16%, transparent)"></i>quand vous tirez l'eau chaude (${rangesW})</span>`:nothing}
+   ${sunny?html`<span><i style="--c:color-mix(in oklab, var(--nw-sun) 45%, transparent)"></i>soleil en trop prévu</span>`:nothing}
+   ${['soleil','soleil_partiel','heures_creuses','heures_pleines','base'].filter(k=>used.has(k)).map(k=>html`<span><i style="--c:var(${SOURCE_C[k]})"></i>chauffe ${SOURCE_W[k]}</span>`)}
+   <span>prix :</span><span><i style="--c:color-mix(in oklab, var(--nw-cold) 60%, transparent)"></i>heures creuses</span><span><i style="--c:color-mix(in oklab, var(--nw-peak) 45%, transparent)"></i>heures pleines</span>
+  </div>`;
 }
 
 if(!customElements.get('hestia-energy-card'))customElements.define('hestia-energy-card',HestiaEnergyCard);
