@@ -1,4 +1,4 @@
-## À venir
+## 1.0.1b2 — Choisir la prise et la sonde du chauffe-eau
 
 ### Corrections
 
