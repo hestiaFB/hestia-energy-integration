@@ -297,3 +297,20 @@ class ABusyDay(unittest.TestCase):
     def test_eight_days_in_ten_draw_no_more(self):
         self.assertEqual(w.busy_day([3, 4, 4, 5, 5, 5, 6, 6, 7, 9]), 6)
         self.assertEqual(w.busy_day([4.0, 5.0, 6.0]), 6.0)
+
+
+class KeptOnIsNotHotWaterFirst(unittest.TestCase):
+    """Frank, 26 Nov. 2026: after « Chauffer maintenant » the tank was full, and the page said « Chauffe maintenant en
+    heures pleines… sinon l'eau chaude manquerait » for a quarter hour of 0 kWh: the plug only kept on a few minutes."""
+
+    def test_a_quarter_hour_kept_on_at_peak_price_is_not_urgent(self):
+        p, _, _ = plan(at(26, 21, 15), start=9.0, keep_on=True)
+        self.assertTrue(p.on[0])
+        self.assertEqual(p.source[0], "heures_pleines")
+        self.assertFalse(p.urgent)
+        self.assertNotIn("manquerait", w.say(p, at(26, 21, 15), PARIS, False, False, mode=w.AUTO))
+
+    def test_a_real_shortage_at_peak_price_is_still_urgent(self):
+        p, _, _ = plan(at(26, 17), start=0.5)
+        self.assertTrue(p.on[0])
+        self.assertTrue(p.urgent)

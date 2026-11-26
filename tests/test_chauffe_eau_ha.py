@@ -233,6 +233,34 @@ class InventedHome(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(c.data["chauffe_eau"]["raison"], "boost")
         self.assertEqual(self.commands, [])
 
+    async def test_the_forced_heating_is_counted_apart(self):
+        """Frank, 26 Nov. 2026: a forced heating at peak price made « Ce que le plan a coûté » dearer than the off-peak
+        hours. It is the household's choice: counted apart, never in the plan nor in its off-peak comparison."""
+        _, c = await self.setup({"chauffe_eau": {"mode": "automatique"}})
+        h = c.heater
+        now = datetime(2026, 11, 26, 20, 0, tzinfo=c.tz)
+        h.boost(now)
+        h._ledger_at = now
+        h._ledger(now + timedelta(minutes=15), 2400.0, 2400.0, {"prix": 0.27})
+        day = h.ledger["2026-11-26"]
+        self.assertAlmostEqual(day["force_kwh"], 0.6, places=3)
+        self.assertAlmostEqual(day["force_eur"], 0.162, places=3)
+        self.assertEqual(day["hestia_kwh"], 0.0)
+        self.assertEqual(day["hc_eur"], 0.0)
+        h.stop_boost()
+        h._ledger(now + timedelta(minutes=30), 2400.0, 2400.0, {"prix": 0.27})
+        self.assertAlmostEqual(h.ledger["2026-11-26"]["hestia_kwh"], 0.6, places=3)
+
+    async def test_a_full_tank_is_not_kept_on(self):
+        _, c = await self.setup({"chauffe_eau": {"mode": "automatique", "prise": "switch.prise_chauffe_eau"}})
+        h = c.heater
+        h.on = True
+        h.tank.kwh = 1000.0     # above any capacity: full
+        h.replan()
+        c._update_live()
+        self.assertNotEqual(c.data["chauffe_eau"]["raison"], "eau_chaude_d_abord")
+        self.assertFalse(h.plan.on[0] and h.plan.energy[0] <= 0.01)
+
     async def test_learning_heats_off_peak_and_says_what_is_left(self):
         _, c = await self.setup({"chauffe_eau": {"mode": "apprentissage", "prise": "switch.prise_chauffe_eau"}})
         found = c.data["chauffe_eau"]

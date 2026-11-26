@@ -485,9 +485,10 @@ def make_plan(slots: list[Slot], start_kwh: float, s: Settings, keep_on: bool = 
             chosen[i] = False
     chosen = _runs_of_two(slots, start_kwh, s, chosen, unit)
     chosen = _few_starts(slots, start_kwh, s, chosen, unit)
+    kept = False
     if keep_on and n and not chosen[0] and allowed[0]:
         # Just switched on: a few minutes more rather than a flicker of the plug (the coordinator decides when).
-        chosen[0] = True
+        chosen[0] = kept = True
     reserve, energy = _simulate(slots, start_kwh, s, chosen)
     costs, sources = [], []
     for slot, e, on in zip(slots, energy, chosen):
@@ -498,7 +499,8 @@ def make_plan(slots: list[Slot], start_kwh: float, s: Settings, keep_on: bool = 
         low = next((i for i, r in enumerate(reserve) if r < s.min_kwh - 1e-6), None)
         short_at = slots[low].start if low is not None and reserve[low] < 0 else None
     # The plan only takes the peak price when nothing cheaper is left before the reserve runs short: hot water first.
-    urgent = bool(chosen and chosen[0] and sources[0] == "heures_pleines")
+    # A quarter hour only kept on is not hot water first (1.0.1b6).
+    urgent = bool(chosen and chosen[0] and sources[0] == "heures_pleines" and not kept)
     return Plan(slots, chosen, reserve, energy, sources, costs, short_at, urgent, hygiene)
 
 

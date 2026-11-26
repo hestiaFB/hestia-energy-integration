@@ -30,7 +30,7 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
 type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
  reserve:number|null;reserve_reelle?:number|null;sonde?:boolean;force_jusqu_a?:string|null;apprentissage?:{jours:number;sur:number;plein_vu:boolean;puissance:boolean;pret:boolean;phrase:string}|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
- soleil_prevu:string|null;plein_le:string|null;bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
+ soleil_prevu:string|null;plein_le:string|null;bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean;force_kwh?:number;force_eur?:number}[];
  appris:{days?:number}|null;manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 type HeaterSettings={mode?:string;appareil?:string|null;prise?:string|null;sonde?:string|null;litres?:number|null;puissance_w?:number|null;heures?:string[];reserve_min?:number;demarrages?:number;consigne?:number};
 type Found<V>={valeur:V|null;source:string|null};
@@ -39,7 +39,7 @@ type Settings={reglages:Record<string,unknown>;trouve:{option:Found<string>;offp
  margin:Found<number>;sac_kg:number|null;notify:{id:string;nom:string}[];a:{revente:boolean;eau:boolean;poele:boolean;delestage:boolean;un_compteur:boolean}}};
 
 const REPO='https://github.com/hestiaFB/hestia-energy-integration';
-const VERSION='1.0.1b5';
+const VERSION='1.0.1b6';
 const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
 const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
  ['apprentissage','Apprentissage','Chauffe en heures creuses, comme avant, le temps que Hestia apprenne le ballon (une semaine, et un plein vu). Il dit quand passer en Automatique.'],
@@ -442,7 +442,7 @@ export class HestiaEnergySetup extends LitElement {
      value:html`<a class="ext-act" href=${BLUEPRINT} target="_blank" rel="noreferrer">Importer</a>`})])}
    ${days.length?listSection('Les derniers jours',days.map(d=>{const day=new Date(d.jour+'T12:00');
      return listRow({label:cap(`${DAYS[day.getDay()]} ${dayOf(day)}`),value:html`<span class="money">${eur(d.reel_eur)}</span>`,
-      sub:`${kwh(d.reel_kwh)}. Avec le plan de Hestia : ${eur(d.hestia_eur)} ; tout en heures creuses : ${eur(d.hc_eur)}.${d.prix_inconnu?' Prix en partie inconnu.':''}`});}),
+      sub:`${kwh(d.reel_kwh)}. Avec le plan de Hestia : ${eur(d.hestia_eur)} ; tout en heures creuses : ${eur(d.hc_eur)}.${(d.force_eur??0)>=0.005?` Marche forcée, comptée à part : ${eur(d.force_eur??0)}.`:''}${d.prix_inconnu?' Prix en partie inconnu.':''}`});}),
      {help:'Ce que le chauffe-eau a coûté chaque jour, comparé à ce que le plan de Hestia aurait coûté et à une chauffe toute en heures creuses.'}):nothing}`;
  }
 

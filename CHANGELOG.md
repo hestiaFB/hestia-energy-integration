@@ -1,3 +1,10 @@
+## 1.0.1b6 — La marche forcée comptée à part
+
+### Corrections
+
+- Chauffe-eau : après « Chauffer maintenant », une fois le ballon plein, la page ne dit plus « Chauffe maintenant en heures pleines… sinon l’eau chaude manquerait » avec une chauffe de 0 kWh. Hestia laissait la prise allumée quelques minutes de plus, pour ne pas la faire claquer : elle ne le fait plus quand le ballon est plein, et ces quelques minutes ne passent jamais pour une urgence.
+- « Ce que le plan a coûté » ne compte plus la marche forcée : c’est votre choix, pas celui du plan. Elle est montrée à part, sur la carte et dans les derniers jours de la page Chauffe-eau. Avant, une marche forcée en heures pleines rendait le plan plus cher que les heures creuses seules. Les jours d’avant cette version gardent l’ancien calcul.
+
 ## 1.0.1b5 — Le chauffe-eau prêt avant chaque plage, votre vrai ballon en Simulation
 
 ### Nouveautés

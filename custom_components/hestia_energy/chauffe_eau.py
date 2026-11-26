@@ -279,7 +279,10 @@ class WaterHeater:
             settings = wh.Settings(capacity, power_kw, min_kwh, self.c.contract.export_price if self.c.contract else None,
                                    limit_kw, int(s.get("demarrages") or 4), hygiene_due)
             previous = self.plan
-            self.plan = wh.make_plan(slots, self.tank.kwh or 0.0, settings, keep_on=self.on and not near_breaker)
+            # Kept on a few minutes more only while there is room: a full tank (after « Chauffer maintenant », say) heats
+            # nothing, and a quarter hour at peak price would read as « hot water first » (1.0.1b6).
+            has_room = (self.tank.kwh or 0.0) < capacity - 0.05
+            self.plan = wh.make_plan(slots, self.tank.kwh or 0.0, settings, keep_on=self.on and has_room and not near_breaker)
             self._clouds = bool(previous and previous.on and previous.on[0] and previous.source[0] in ("soleil", "soleil_partiel")
                                 and not self.plan.on[0] and self._ratio is not None and self._ratio < 0.5)
             self._planned_at, self._mode_planned = now, mode
@@ -398,6 +401,8 @@ class WaterHeater:
         day = now.astimezone(self.c.tz).date().isoformat()
         entry = self.ledger.setdefault(day, {"reel_kwh": 0.0, "reel_eur": 0.0, "hestia_kwh": 0.0, "hestia_eur": 0.0,
                                              "hc_eur": 0.0, "prix_inconnu": False})
+        entry.setdefault("force_kwh", 0.0)
+        entry.setdefault("force_eur", 0.0)
 
         def euros(watts: float, others_w: float | None) -> float | None:
             sun = 0.0
@@ -415,7 +420,14 @@ class WaterHeater:
                 entry["prix_inconnu"] = True
             else:
                 entry["reel_eur"] += e
-        if hestia_w > 0:
+        if hestia_w > 0 and self._boost_until is not None:
+            # « Chauffer maintenant » is the household's choice, not the plan's: counted apart (1.0.1b6), so that the
+            # plan is not compared with the off-peak hours on a heating it did not choose.
+            e = euros(hestia_w, others)
+            entry["force_kwh"] += hestia_w / 1000 * hours
+            if e is not None:
+                entry["force_eur"] += e
+        elif hestia_w > 0:
             e = euros(hestia_w, others)
             entry["hestia_kwh"] += hestia_w / 1000 * hours
             if e is not None:
