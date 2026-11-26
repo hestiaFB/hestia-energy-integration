@@ -15,7 +15,7 @@ import {follow,type Connection} from './stream';
        per card, then the panels (a title in plain words, a sentence with a figure, a drawing).
    Every figure comes from the integration (hestia_energy/view): the card only puts it into words. */
 
-type Hass={callWS:<T>(msg:Record<string,unknown>)=>Promise<T>;states:Record<string,{last_updated:string}>;connection:Connection};
+type Hass={callWS:<T>(msg:Record<string,unknown>)=>Promise<T>;states:Record<string,{last_updated:string}>;connection:Connection;user?:{is_admin?:boolean}};
 type Banner={id:string;couleur:string;pastille:string;titre:string;pourquoi:string};
 type Period={euros:number|null;euros_energie:number|null;kwh_achetes:number;soleil_kwh:number|null;revendu_kwh:number|null;revendu_euros:number|null;soleil_couvre:number|null;soleil_garde:number|null;heures_inconnues:number;debut:string};
 type Hour={h:number;achat:number|null;soleil:number|null;revente:number|null};
@@ -55,7 +55,7 @@ type HeatCost={aujourdhui:HeatDay;hier:HeatDay|null;mois:Omit<HeatDay,'jour'|'pr
     half hour from now, [start, reserve %, sun to spare forecast kW, price, off-peak 1/0, the heating's source or null]. */
 type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
- reserve:number|null;reserve_kwh:number|null;reserve_reelle?:number|null;reserve_reelle_kwh?:number|null;sonde?:boolean;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
+ reserve:number|null;reserve_kwh:number|null;reserve_reelle?:number|null;reserve_reelle_kwh?:number|null;sonde?:boolean;force_jusqu_a?:string|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
  manque_a:string|null;courbe:[string,number,number,number|null,number,string|null][];soleil_prevu:string|null;plein_le:string|null;heures:number[];plages?:[number,number][];reserve_min:number;
  bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
  manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
@@ -824,6 +824,10 @@ class HestiaEnergyCard extends LitElement {
      <div class="nw-legend"><span><i style="--c:var(--nw-grid)"></i>pris au réseau, en moyenne sur l'heure</span>${ranges.length?html`<span><i style="--c:color-mix(in oklab, var(--nw-cold) 40%, transparent)"></i>heures creuses</span>`:nothing}</div>`,{wide:true})}</div>`;
  }
 
+ /** The forced heating of the water heater, or its stop (the card's « Chauffer maintenant »). */
+ private async _force(stop:boolean){
+  try{await this._hass?.callWS({type:'hestia_energy/chauffe_eau_force',arret:stop});}catch(e){console.warn('Hestia Énergie : marche forcée refusée',e);}
+ }
  private _heater(v:View,over:boolean){
   const w=v.chauffe_eau,head={ic:'heater',c:'--nw-water',subject:'Chauffe-eau',period:'les prochaines heures',over};
   if(!w)return this._ans({...head,msg:'Pas de chauffe-eau dans la page Énergie',why:'Ajoutez sa prise mesurée dans la page Énergie de Home Assistant (consommation individuelle) : Hestia préparera son plan de chauffe.'});
@@ -854,7 +858,8 @@ class HestiaEnergyCard extends LitElement {
   if(w.manque.includes('besoin'))todo.push('quelques jours encore, pour apprendre combien d’eau chaude la maison tire');
   const settings=this._enc('Réglages',html`Mode <b>${MODE_W[w.mode]??w.mode}</b>${w.simulation?' : Hestia montre ce qu’il ferait, votre automatisation ne fait rien.':'.'}
     ${w.suit===false?html` <b>La prise ne suit pas le plan</b> : vérifiez l’automatisation.`:nothing}${todo.length?html` Il manque ${todo.join(', ')}.`:nothing}`,nothing,
-   {foot:html`<a class="to-hub" href="/hestia/energie/chauffe-eau" @click=${toHub}>Régler le chauffe-eau ›</a>`});
+   {foot:html`<div class="whf">${this._hass?.user?.is_admin===false?nothing:html`<button type="button" class="whb" @click=${()=>void this._force(!!w.force_jusqu_a)}>${w.force_jusqu_a?`Arrêter la marche forcée (jusqu’à ${hmd(new Date(w.force_jusqu_a))})`:'Chauffer maintenant'}</button>`}
+    <a class="to-hub" href="/hestia/energie/chauffe-eau" @click=${toHub}>Régler le chauffe-eau ›</a></div>`});
   // Simulation: the household's own tank first (followed from what the heater really takes), the plan's after.
   const own=w.simulation&&w.reserve_reelle!=null,shown=own?w.reserve_reelle!:w.reserve,shownKwh=own?w.reserve_reelle_kwh:w.reserve_kwh;
   const est=w.sonde?'':', estimée';

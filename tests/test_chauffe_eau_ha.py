@@ -210,6 +210,29 @@ class InventedHome(unittest.IsolatedAsyncioTestCase):
         _, c = await self.setup({"chauffe_eau": {"mode": "automatique"}})
         self.assertIsNone(c.data["chauffe_eau"]["reserve_reelle"])
 
+    async def test_the_forced_heating_starts_and_stops_from_the_panel(self):
+        from custom_components.hestia_energy import websocket
+        _, c = await self.setup({"chauffe_eau": {"prise": "switch.prise_chauffe_eau"}})
+
+        class Connection:
+            def __init__(self):
+                self.results = []
+
+            def send_result(self, _id, result):
+                self.results.append(result)
+
+            def send_error(self, _id, code, text):
+                self.results.append({"erreur": code})
+        handler = websocket.ws_heater_force.__wrapped__ if hasattr(websocket.ws_heater_force, "__wrapped__") else websocket.ws_heater_force
+        conn = Connection()
+        handler(self.hass, conn, {"id": 1, "type": "hestia_energy/chauffe_eau_force", "arret": False})
+        self.assertIsNotNone(conn.results[-1]["force_jusqu_a"])
+        self.assertEqual(c.data["chauffe_eau"]["raison"], "boost")
+        handler(self.hass, conn, {"id": 2, "type": "hestia_energy/chauffe_eau_force", "arret": True})
+        self.assertIsNone(conn.results[-1]["force_jusqu_a"])
+        self.assertNotEqual(c.data["chauffe_eau"]["raison"], "boost")
+        self.assertEqual(self.commands, [])
+
 
 if __name__ == "__main__":
     unittest.main()

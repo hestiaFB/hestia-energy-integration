@@ -29,7 +29,7 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
 /** The water heater driven by Hestia (1.0.1b1, chauffe_eau.py): what the card shows, and its settings. */
 type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
- reserve:number|null;reserve_reelle?:number|null;sonde?:boolean;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
+ reserve:number|null;reserve_reelle?:number|null;sonde?:boolean;force_jusqu_a?:string|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
  soleil_prevu:string|null;plein_le:string|null;bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
  appris:{days?:number}|null;manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 type HeaterSettings={mode?:string;appareil?:string|null;prise?:string|null;sonde?:string|null;litres?:number|null;puissance_w?:number|null;heures?:string[];reserve_min?:number;demarrages?:number;consigne?:number};
@@ -356,6 +356,10 @@ export class HestiaEnergySetup extends LitElement {
  /* ── Chauffe-eau (1.0.1b1): the plan Hestia makes, its mode, and what it needs to know. Hestia never commands the
     heater itself: the household's automation (the blueprint) follows binary_sensor.hestia_energy_chauffe_eau. ── */
  private heaterVal():HeaterSettings{return (this.val<HeaterSettings|null>('chauffe_eau')??{}) as HeaterSettings;}
+ /** The forced heating (« Chauffer maintenant »), or its stop: then the page again. */
+ private async force(stop:boolean){
+  try{await this.hass!.callWS({type:'hestia_energy/chauffe_eau_force',arret:stop});await this.load();}catch(e){this.error=String((e as {message?:string})?.message??e);}
+ }
  private setHeater(k:keyof HeaterSettings,v:unknown){this.set('chauffe_eau',{...this.heaterVal(),[k]:v});}
  private heaterPage(h:Hub){
   const w=h.chauffe_eau,s=this.heaterVal(),states=this.hass?.states??{},devices=h.chauffe_eau_appareils??[];
@@ -399,6 +403,10 @@ export class HestiaEnergySetup extends LitElement {
      {value:w.chauffer?(w.jusqu_a?'jusqu’à '+hm(new Date(w.jusqu_a)):'en cours'):w.prochaine_chauffe?when(w.prochaine_chauffe):'—',label:w.chauffer?'chauffe':'prochaine chauffe'},
      {value:w.cout_prevu!=null?eur(w.cout_prevu):'—',label:w.kwh_prevus!=null?`prévus pour ${kwh(w.kwh_prevus)}`:'prévus'}]):nothing}
    ${todo.length?listSection('À régler',todo):nothing}
+   ${w?listSection('Marche forcée',[listRow({label:w.force_jusqu_a?html`<b>Chauffe jusqu’au plein</b>`:'Chauffer maintenant, jusqu’au plein',
+     sub:w.force_jusqu_a?`Au plus jusqu’à ${hm(new Date(w.force_jusqu_a))}, puis le plan reprend.${sim?' En Simulation, rien n’est commandé.':''}`
+      :`Pour une eau chaude tout de suite, ou pour que Hestia voie le ballon plein. Au plus 4 heures, puis le plan reprend.${sim?' En Simulation, rien n’est commandé.':''}`,
+     value:html`<button type="button" class="ext-act" @click=${()=>void this.force(!!w.force_jusqu_a)}>${w.force_jusqu_a?'Arrêter':'Chauffer'}</button>`})]):nothing}
    ${w?.plan.length?listSection('Les prochaines chauffes',w.plan.map(r=>listRow({label:`${when(r.debut)} – ${hm(new Date(r.fin))}`,sub:`${cap(HEATER_SOURCE[r.source]??r.source)}, ${kwh(r.kwh)}.`,value:html`<span class="money">${eur(r.euros)}</span>`})),
      {help:`Le plan des 36 prochaines heures, refait toutes les 5 minutes. ${w.soleil_prevu==='prevision'?'Le soleil prévu vient de la prévision de la page Énergie.':w.soleil_prevu==='nuages'?'Le soleil prévu vient des nuages annoncés par Hestia Météo et de ce que vos panneaux produisent par beau temps.':w.soleil_prevu==='habitude'?'Sans prévision, Hestia prend le soleil habituel de ces derniers jours.':''} La veille, Hestia ne compte que sur 70 % du soleil prévu.`}):nothing}
    ${listSection('Le mode',[listRow({label:'Mode',control:true,sub:HEATER_MODES.find(m=>m[0]===mode)?.[2],

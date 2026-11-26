@@ -353,8 +353,13 @@ class WaterHeater:
         return ("plein" if full else "attente"), False
 
     def boost(self, now: datetime) -> None:
-        """« Chauffer maintenant »: until the tank is full (at most 4 hours), then the plan again."""
+        """« Chauffer maintenant » (the forced heating): until the tank is full (at most 4 hours), then the plan again."""
         self._boost_until = now + BOOST_MAX
+        self._planned_at = None
+
+    def stop_boost(self) -> None:
+        """The forced heating stopped by hand: the plan again."""
+        self._boost_until = None
         self._planned_at = None
 
     def replan(self) -> None:
@@ -445,6 +450,7 @@ class WaterHeater:
             "jusqu_a": current["fin"] if current and self.on else None,
             "prochaine_chauffe": following["debut"] if following else (current["debut"] if current and not self.on else None),
             "reserve": pct, "reserve_kwh": None if self.tank.kwh is None else round(self.tank.kwh, 2),
+            "force_jusqu_a": self._boost_until.isoformat() if self._boost_until else None,
             # Simulation: the household's own tank (the plan's is `reserve`); None when Hestia drives the heater.
             "reserve_reelle": None if mode != wh.SIMULATION or self.real.kwh is None else round(self.real.kwh / capacity * 100),
             "reserve_reelle_kwh": None if mode != wh.SIMULATION or self.real.kwh is None else round(self.real.kwh, 2),

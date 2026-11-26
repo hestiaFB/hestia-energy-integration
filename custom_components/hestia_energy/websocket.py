@@ -8,6 +8,7 @@ import voluptuous as vol
 from homeassistant.components import websocket_api
 from homeassistant.core import callback
 from homeassistant.exceptions import HomeAssistantError
+from homeassistant.util import dt as dt_util
 
 from . import hub_view
 from .const import DOMAIN
@@ -29,7 +30,7 @@ def _coordinator(hass):
 
 
 def async_setup_websocket(hass) -> None:
-    for command in (ws_view, ws_subscribe, ws_detail, ws_periods, ws_sources, ws_simulate, ws_hub, ws_settings, ws_set_settings):
+    for command in (ws_view, ws_subscribe, ws_detail, ws_periods, ws_sources, ws_simulate, ws_hub, ws_settings, ws_set_settings, ws_heater_force):
         websocket_api.async_register_command(hass, command)
 
 
@@ -263,6 +264,25 @@ def ws_hub(hass, connection, msg):
         connection.send_result(msg["id"], {"pret": False})
         return
     connection.send_result(msg["id"], hub_view.build(hass, c))
+
+
+@websocket_api.websocket_command({vol.Required("type"): "hestia_energy/chauffe_eau_force", vol.Optional("arret", default=False): bool})
+@websocket_api.require_admin
+@callback
+def ws_heater_force(hass, connection, msg):
+    """The forced heating of the water heater (the button « Chauffe-eau : chauffer maintenant »), from the panel or the
+    card: until the tank is full, at most 4 hours; `arret` stops it. Hestia still commands nothing itself: the
+    household's automation follows the binary sensor, and in Simulation it does nothing."""
+    c = _coordinator(hass)
+    if c is None or c.heater is None:
+        connection.send_error(msg["id"], "not_ready", "Hestia Énergie n'est pas activée.")
+        return
+    if msg["arret"]:
+        c.heater.stop_boost()
+    else:
+        c.heater.boost(dt_util.utcnow())
+    c._update_live()
+    connection.send_result(msg["id"], {"force_jusqu_a": (c.data.get("chauffe_eau") or {}).get("force_jusqu_a")})
 
 
 @websocket_api.websocket_command({vol.Required("type"): "hestia_energy/set_settings", vol.Required("reglages"): dict})

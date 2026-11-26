@@ -1,5 +1,9 @@
 ## 1.0.1b5 — Le chauffe-eau prêt avant chaque plage, votre vrai ballon en Simulation
 
+### Nouveautés
+
+- Chauffe-eau : **marche forcée**. Un bouton « Chauffer maintenant » dans la page Chauffe-eau et sur la carte : le chauffe-eau chauffe jusqu’au plein (4 heures au plus), puis le plan reprend. « Arrêter » l’interrompt. Pratique pour une eau chaude tout de suite, ou pour que Hestia voie le ballon plein. En Simulation, rien n’est commandé.
+
 ### Corrections
 
 - Chauffe-eau : le ballon est prêt **avant** chaque plage d’eau chaude, comme promis. Avant, le plan ne gardait que le minimum (30 %) : il pouvait arriver au plus bas à 6 h 30 et chauffer pendant la douche. Maintenant, au début de chaque plage, il y a le minimum plus l’eau de la plage. Si le minimum tient déjà, ce complément ne se paie jamais en heures pleines : seulement en heures creuses ou au soleil.

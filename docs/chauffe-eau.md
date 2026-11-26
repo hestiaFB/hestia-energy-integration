@@ -55,6 +55,10 @@ Quand le chauffe-eau est piloté, Hestia voit aussi qu’il est **plein** : la p
 
 En **Simulation**, Hestia suit deux ballons : **le vôtre**, d’après ce que le chauffe-eau consomme vraiment (plein quand il s’arrête tout seul en heures creuses, pas quand les heures creuses finissent), et **celui du plan**, qu’il aurait s’il était piloté. La carte, la page et l’entité « Chauffe-eau : réserve » montrent le vôtre ; celui du plan est à côté (attribut `reserve_plan` de l’entité).
 
+## La marche forcée
+
+Le bouton **Chauffer maintenant** (page Chauffe-eau, carte, ou l’entité « Chauffe-eau : chauffer maintenant ») fait chauffer le ballon jusqu’au plein, 4 heures au plus, puis le plan reprend. **Arrêter** l’interrompt. Comme le reste, il passe par « Chauffe-eau : chauffer » et votre automatisation : en Simulation, rien n’est commandé.
+
 ## Les modes
 
 Le mode se choisit dans la page Chauffe-eau, ou par l’entité **Chauffe-eau : mode**.
