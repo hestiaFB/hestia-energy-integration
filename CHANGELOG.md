@@ -1,3 +1,16 @@
+## À venir — La batterie dans « En ce moment »
+
+### Nouveautés
+
+- **La batterie de la maison** dans « En ce moment » : un cercle sous la maison, avec sa charge en % en anneau, et ce qu’elle prend (en charge) ou donne à la maison. La phrase en parle : « Le soleil couvre toute la maison et charge la batterie : 0,4 kW. Elle est à 18 % : pleine vers 18 h 10 à ce rythme. » ou « Le soleil en couvre 27 %, la batterie le reste. Elle est à 78 % : à ce rythme, elle couvre les heures pleines jusqu’à 22 h. » Un jour rouge Tempo, elle dit si la batterie tiendra jusqu’à la fin des heures pleines.
+- La charge en % est trouvée toute seule, sur l’appareil de la batterie (son onduleur). La capacité est apprise au fil des charges. Les deux se corrigent par l’action `hestia_energy.set_settings` (`battery_soc`, `battery_kwh`) si Hestia s’est trompée.
+
+### Corrections
+
+- La charge de la batterie n’est plus comptée dans « Maison » : avec 735 W de soleil et 449 W qui vont dans la batterie, la maison consomme 286 W, plus 735 W.
+- Plus de « le reste vient du réseau : 0,00 € de l’heure » quand rien ne vient du réseau.
+- Quand la revente ne rapporte rien (prix à 0 €), le surplus est dit « injecté » dans le réseau, plus « revendu », sur la carte et dans la carte Soleil.
+
 ## 1.0.1b2 — Choisir la prise et la sonde du chauffe-eau
 
 ### Corrections

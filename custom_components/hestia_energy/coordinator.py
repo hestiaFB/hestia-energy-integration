@@ -25,6 +25,7 @@ from homeassistant.util import dt as dt_util
 from . import hub_view, reader
 from .chauffe_eau import WaterHeater
 from .const import DOMAIN
+from .engine import battery as engine_battery
 from .engine import water_heater as engine_heater
 from .engine import advice, anomaly, baseline, cards, daily, habits, health, heating, hub, solar, home as engine_home, live, phrases, report, sources, stats, tariff
 from .engine.rows import Rows, merge as merge_rows
@@ -40,6 +41,9 @@ DEFAULTS = {"kva": None, "option": None, "margin": 0.1, "watched": {"seche_servi
             "bag_price": None,
             # the off-peak hours as typed (« 22:00-06:00 »), used when no meter shows them
             "offpeak": None, "offpeak_weekend": None,
+            # 1.0.1b3: the home battery's charge sensor (%) when the one found is not the right one, and its usable kWh
+            # when the one learned is not right
+            "battery_soc": None, "battery_kwh": None,
             # 2.9: the reviews sent by a notify service of Home Assistant, at this hour; None: no notification (default)
             "notify_service": None, "notify_hour": 8,
             # The hub (INTERFACE.md § 5, H7): which reviews are sent, and the alerts sent at once.
@@ -94,6 +98,9 @@ class EnergyCoordinator:
         # The Tempo colour of each day seen (the Recorder forgets them after ten days, the bills need them all).
         self.colour_store = Store(hass, 1, f"{DOMAIN}.tempo")
         self.colours: dict[date, str] = {}
+        # The home battery (1.0.1b3): the capacities learned from its swings of charge, kept across restarts.
+        self.battery_store = Store(hass, 1, f"{DOMAIN}.battery")
+        self.battery = engine_battery.Battery()
         self.cold: dict[date, float] = {}
         self.weather_cold = "non"
         self.weather: dict = {"etat": "non", "lieu": None, "nom": None, "lieux": [], "choisi": False}
@@ -152,6 +159,7 @@ class EnergyCoordinator:
         self._cold_place = kept.get("lieu")
         self.cold = {date.fromisoformat(d): v for d, v in kept.items() if d != "lieu"}
         self.colours = {date.fromisoformat(d): c for d, c in (await self.colour_store.async_load() or {}).items()}
+        self.battery.learned = list((await self.battery_store.async_load() or {}).get("capacites_kwh") or [])
         # The regulated tariffs embedded in the brick: a file, read in a worker thread (never on the loop).
         self.table = await self.hass.async_add_executor_job(tariff.load_regulated)
         self.page = sources.read_page(await reader.energy_prefs(self.hass))
@@ -164,6 +172,7 @@ class EnergyCoordinator:
         self.data["source"] = self._source()
         periods = {m.period for m in self.page.imports}
         self.extras["prevision"] = any(m.forecasts for m in self.page.solar)
+        self.extras["battery_soc"] = self._battery_soc()
         self.data.update({"equipement": _level(self.level), "extensions": dict(self.extras), "marge": self.settings["margin"],
                           "contrat": {"option": self.settings.get("option") or ("hphc" if {"hp", "hc"} <= periods
                                                                                 else "base" if self.page.imports else None)}})
@@ -359,6 +368,7 @@ class EnergyCoordinator:
         self.page = sources.read_page(prefs)
         self.extras = reader.detect(self.hass)
         self.extras["prevision"] = any(m.forecasts for m in self.page.solar)
+        self.extras["battery_soc"] = self._battery_soc()
         # The other bricks, as Home Assistant has loaded them (never guessed from entity names).
         self.extras["meteo"] = "hestia_weather" in self.hass.config.components
         self.extras["confort"] = "hestia_comfort" in self.hass.config.components
@@ -838,7 +848,7 @@ class EnergyCoordinator:
         for meter in self.page.meters:
             entities |= set(meter.power.entities)
         entities |= {e for e in (self.extras.get("period"), self.extras.get("tempo_today"), self.extras.get("tempo_tomorrow"),
-                                 self.extras.get("inverter")) if e}
+                                 self.extras.get("inverter"), self.extras.get("battery_soc")) if e}
         heater = self.heater.settings
         entities |= {e for e in (heater.get("prise"), heater.get("sonde")) if e}
         if self._live_unsub:
@@ -875,6 +885,65 @@ class EnergyCoordinator:
         local = [self.locality.get(r.entity_id) for r, _ in parts]
         return live.Candidate(name, parts, local=all(local) if all(v is not None for v in local) else None,
                               late=any(r is not None and r.lag for r in readings))
+
+    def _battery_soc(self) -> str | None:
+        """The battery's charge sensor: the household's choice, else the one found by the battery's device."""
+        if not self.page or not (self.page.batteries_in or self.page.batteries_out):
+            return None
+        if self.settings.get("battery_soc"):
+            return self.settings["battery_soc"]
+        meters = [*self.page.batteries_in, *self.page.batteries_out]
+        own = [e for m in meters for e in (*m.power.entities, *([] if m.external else [m.stat]))]
+        return reader.battery_soc(self.hass, own)
+
+    def _battery_power(self) -> live.Candidate | None:
+        """What the battery gives the home now (W, positive) or takes (negative), as the Energy page reads it (Home
+        Assistant's convention for a battery: positive when it discharges). One power per battery, never counted twice
+        for its two meters."""
+        seen, meters = set(), []
+        for meter in [*self.page.batteries_out, *self.page.batteries_in]:
+            if meter.power.entities and meter.power not in seen:
+                seen.add(meter.power)
+                meters.append(meter)
+
+        def gives(m):
+            if m.power.rate:
+                return [(m.power.rate, -1 if m.power.inverted else 1)]
+            return [e for e in ((m.power.rate_from, 1), (m.power.rate_to, -1)) if e[0]]
+
+        return self._candidate(meters, "Page Énergie", gives)
+
+    def _battery_now(self, now: datetime) -> dict | None:
+        """The battery for « En ce moment »: its power, its charge, and its capacity learned as it goes."""
+        if not self.page or not (self.page.batteries_in or self.page.batteries_out):
+            return None
+        power = self._battery_power()
+        verdict = live.judge("batterie", [power] if power else [], now)
+        soc = self._number(self.extras.get("battery_soc"))
+        soc = soc if soc is not None and 0 <= soc <= 100 else None
+
+        def total(meters):
+            values = [self._kwh(m.stat) for m in meters if not m.external]
+            return sum(values) if values and None not in values else None
+
+        if self.battery.learn(now, soc, total(self.page.batteries_in), total(self.page.batteries_out)):
+            self._background(self.battery_store.async_save({"capacites_kwh": self.battery.learned}), f"{DOMAIN}_battery_saved")
+        return engine_battery.now(verdict.value, soc, self.battery.capacity(self.settings.get("battery_kwh")), now)
+
+    def _number(self, entity_id: str | None) -> float | None:
+        state = self.hass.states.get(entity_id) if entity_id else None
+        try:
+            return float(state.state) if state is not None else None
+        except (TypeError, ValueError):
+            return None
+
+    def _kwh(self, entity_id: str) -> float | None:
+        """A meter's total in kWh, from its state (Wh and MWh meters too)."""
+        value = self._number(entity_id)
+        if value is None:
+            return None
+        unit = self.hass.states.get(entity_id).attributes.get("unit_of_measurement")
+        return value * {"Wh": 0.001, "kWh": 1.0, "MWh": 1000.0}.get(unit or "kWh", 1.0)
 
     def _inverter(self) -> live.Candidate | None:
         reading = self._reading(self.extras.get("inverter"))
@@ -962,9 +1031,13 @@ class EnergyCoordinator:
             price = tariff.price_at(self.contract, self.table, now, self.tz, None if period in (None, "base") else period,
                                     tempo["couleur"])
         heat_now = heating.now(reader.thermostats(self.hass) if self.used("vt") else [])
+        battery = self._battery_now(now)
+        # What the battery takes is not the home's, what it gives is (HACF, 26 Nov. 2026: its charge counted in « Maison »).
+        stored = 0.0 if not battery else (battery["decharge_w"] or 0) - (battery["charge_w"] or 0)
         self.data["direct"] = {
             "achat_w": bought, "revente_w": exported, "soleil_w": produced,
-            "maison_w": None if bought is None else bought + (produced or 0.0) - (exported or 0.0),
+            "maison_w": None if bought is None else max(0.0, bought + (produced or 0.0) - (exported or 0.0) + stored),
+            "batterie": battery,
             "periode": period, "prochain_changement": None if not change else {"a": change[0].isoformat(), "periode": change[1]},
             "prix": price, "couleur": tempo["couleur"], "couleur_demain": tempo["couleur_demain"],
             "en_marche": [{"nom": r.name, "type": r.kind, "w": round(r.watts)} for r in running],

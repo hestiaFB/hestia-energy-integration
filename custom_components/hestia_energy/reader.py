@@ -162,6 +162,40 @@ def detect(hass: HomeAssistant) -> dict:
     return found
 
 
+def battery_soc(hass: HomeAssistant, entities: list[str]) -> str | None:
+    """The battery's charge in %: a sensor of class « battery » on the device of the battery's own entities (its power,
+    its meters), else on the same integration entry (an inverter often puts its battery on a second device). None when
+    there is none, or more than one on the entry and none on the device."""
+    registry = er.async_get(hass)
+    devices, entries = set(), set()
+    for entity_id in entities:
+        entry = registry.async_get(entity_id)
+        if entry is None:
+            continue
+        if entry.device_id:
+            devices.add(entry.device_id)
+        if entry.config_entry_id:
+            entries.add(entry.config_entry_id)
+
+    def is_soc(entry) -> bool:
+        if entry.domain != "sensor" or entry.disabled_by or entry.entity_id in entities:
+            return False
+        state = hass.states.get(entry.entity_id)
+        if state is None or state.attributes.get("unit_of_measurement") != "%":
+            return False
+        return (entry.device_class or entry.original_device_class or state.attributes.get("device_class")) == "battery"
+
+    for device in sorted(devices):
+        found = sorted(e.entity_id for e in er.async_entries_for_device(registry, device) if is_soc(e))
+        if found:
+            return found[0]
+    for config_entry in sorted(entries):
+        found = sorted(e.entity_id for e in er.async_entries_for_config_entry(registry, config_entry) if is_soc(e))
+        if len(found) == 1:
+            return found[0]
+    return None
+
+
 def pellet_tracking(hass: HomeAssistant, sensors: list | None = None) -> dict | None:
     """Suivi Stock Pellet (the pellet stove's extension): its sensors found by the role each one carries
     (`suivi_stock_pellet_key`), so a renamed entity, or a copy of it, is still found; the season's purchases and the

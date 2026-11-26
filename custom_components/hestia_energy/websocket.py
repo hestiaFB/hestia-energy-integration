@@ -191,6 +191,9 @@ SETTINGS = vol.Schema({
     vol.Optional("stove_fuel"): vol.Any(None, vol.In(("pellets", "gas"))),
     # the Hestia Weather place (its entry id) that gives the cold; None: the only one, or the first
     vol.Optional("weather_place"): vol.Any(None, vol.All(str, vol.Length(min=1, max=64))),
+    # 1.0.1b3: the home battery's charge sensor (%) and its usable kWh; None: found and learned by Hestia
+    vol.Optional("battery_soc"): vol.Any(None, vol.All(str, vol.Match(r"^sensor\.[a-z0-9_]+$"))),
+    vol.Optional("battery_kwh"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0.5, max=200))),
     **{vol.Optional(k): bool for k in ("notify_day", "notify_week", "notify_month", "notify_leak", "notify_forgot")},
     vol.Optional("groups"): {str: vol.In(hub.GROUPS)},
     vol.Optional("extensions"): {vol.In(_EXTENSIONS): bool},
@@ -210,13 +213,14 @@ SETTINGS = vol.Schema({
 })
 KEYS = ("kva", "margin", "export_price", "option", "bag_price", "notify_service", "notify_hour", "offpeak", "offpeak_weekend", "offer", "price_hp",
         "price_hc", "price_base", "subscription", "water_price", "stove_fuel", "notify_day", "notify_week", "notify_month",
-        "notify_leak", "notify_forgot", "groups", "extensions", "weather_place", "chauffe_eau")
+        "notify_leak", "notify_forgot", "groups", "extensions", "weather_place", "chauffe_eau",
+        "battery_soc", "battery_kwh")
 
 
 # The contract's settings an automation may change (issue 18: an offer Hestia does not know, its hours and prices
 # set by the household's own automation). The same checks as the hub's.
 SERVICE_KEYS = ("option", "offer", "offpeak", "offpeak_weekend", "price_hp", "price_hc", "price_base", "subscription",
-                "kva", "export_price")
+                "kva", "export_price", "battery_soc", "battery_kwh")
 SERVICE_SCHEMA = vol.Schema({
     **{vol.Optional(k): SETTINGS.schema[vol.Optional(k)] for k in SERVICE_KEYS},
     # an automation's number may come as « 9 » or 9.0
