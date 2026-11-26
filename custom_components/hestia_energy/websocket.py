@@ -205,7 +205,7 @@ SETTINGS = vol.Schema({
         vol.Optional("sonde"): vol.Any(None, vol.All(str, vol.Match(r"^(sensor|water_heater)\.[a-z0-9_]+$"))),
         vol.Optional("litres"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=10, max=1000))),
         vol.Optional("puissance_w"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=300, max=12000))),
-        vol.Optional("heures"): vol.All([vol.All(str, vol.Match(r"^\d{1,2}[:h]\d{2}$"))], vol.Length(max=6)),
+        vol.Optional("heures"): vol.All([vol.All(str, vol.Match(r"^\d{1,2}[:h]\d{2}(-\d{1,2}[:h]\d{2})?$"))], vol.Length(max=6)),
         vol.Optional("reserve_min"): vol.All(vol.Coerce(float), vol.Range(min=0, max=0.8)),
         vol.Optional("demarrages"): vol.All(vol.Coerce(int), vol.Range(min=1, max=12)),
         vol.Optional("consigne"): vol.All(vol.Coerce(float), vol.Range(min=40, max=85)),

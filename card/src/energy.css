@@ -339,6 +339,7 @@ button.piste:focus-visible { outline:2px solid var(--nw-accent); outline-offset:
 .whc .res { fill:none; stroke:var(--nw-water); stroke-width:2.5; stroke-linejoin:round; }
 .whc .min { stroke:var(--nw-act); stroke-width:1; stroke-dasharray:3 4; }
 .whc .hw { stroke:var(--nw-water); stroke-opacity:.35; }
+.whc .hwr { fill:var(--nw-water); fill-opacity:.07; }
 .whc .hwl { font-size:9.5px; font-weight:600; fill:color-mix(in oklab, var(--nw-water) 70%, var(--nw-fg)); }
 .whc .pb { fill-opacity:.5; }
 .hb.list .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--c); margin-right:6px; vertical-align:1px; }
