@@ -214,7 +214,7 @@ class WaterHeater:
         power_kw = (s.get("puissance_w") or 0) / 1000 or learned.power_kw or DEFAULT_POWER_KW
         setpoint = float(s.get("consigne") or 60)
         capacity = wh.capacity_kwh(s.get("litres"), setpoint, learned)
-        times = wh.parse_hours(s.get("heures"))
+        times = wh.parse_ranges(s.get("heures"))
         away = mode == wh.AWAY
 
         def need_at(day: date) -> float:
@@ -415,7 +415,8 @@ class WaterHeater:
             "plan": runs[:8], "kwh_prevus": round(plan.kwh, 2) if plan else None, "cout_prevu": round(plan.euros, 2) if plan else None,
             "manque_a": plan.short_at.isoformat() if plan and plan.short_at else None,
             "courbe": curve, "soleil_prevu": self.forecast_from, "plein_le": self.tank.full_at.isoformat() if self.tank.full_at else None,
-            "heures": wh.parse_hours(self.settings.get("heures")), "reserve_min": float(self.settings.get("reserve_min") or 0.3),
+            "heures": wh.parse_hours(self.settings.get("heures")),
+            "plages": [[start, (start + length) % 1440] for start, length in wh.parse_ranges(self.settings.get("heures"))], "reserve_min": float(self.settings.get("reserve_min") or 0.3),
             "bilan": bilan, "appris": learned.as_dict(), "manque": missing,
             "prise": self.settings.get("prise"), "prise_etat": self._plug(),
             "suit": None if mode == wh.SIMULATION or not self.settings.get("prise") or self._plug() not in ("on", "off")

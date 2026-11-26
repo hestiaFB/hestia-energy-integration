@@ -54,7 +54,7 @@ type HeatCost={aujourdhui:HeatDay;hier:HeatDay|null;mois:Omit<HeatDay,'jour'|'pr
 type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
  reserve:number|null;reserve_kwh:number|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
- manque_a:string|null;courbe:[string,number,number,number|null,number,string|null][];soleil_prevu:string|null;plein_le:string|null;heures:number[];reserve_min:number;
+ manque_a:string|null;courbe:[string,number,number,number|null,number,string|null][];soleil_prevu:string|null;plein_le:string|null;heures:number[];plages?:[number,number][];reserve_min:number;
  bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
  manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 /** « Votre contrat, bien utilisé » (engine/habits.py): the last 12 months. */
@@ -858,6 +858,8 @@ function heaterChart(w:Heater){
  const ticks:TemplateResult[]=[],marks:TemplateResult[]=[];
  pts.forEach((p,i)=>{const d=new Date(p[0]),m=d.getHours()*60+d.getMinutes();
   if(m%360===0)ticks.push(svg`<text x=${X(i)} y=${band+22} text-anchor="middle" class="tk">${m===0?'minuit':hour(d.getHours())}</text>`);
+  // The hot-water ranges (1.0.1b3), lightly shaded behind the curve.
+  if((w.plages??[]).some(([a,b])=>(m-a+1440)%1440<(b-a+1440)%1440))marks.push(svg`<rect x=${X(i)} y=${T} width=${X(i+1)-X(i)+.5} height=${H} class="hwr"></rect>`);
   if(w.heures.some(t=>t>=m&&t<m+30))marks.push(svg`<line x1=${X(i)} x2=${X(i)} y1=${T} y2=${T+H} class="hw"></line><text x=${X(i)+3} y=${T+9} class="hwl">eau chaude</text>`);});
  const sunny=pts.some(p=>p[2]>0.05);
  return html`<svg class="whc" viewBox="0 0 ${W} ${band+28}" role="img" aria-label="Le plan des prochaines heures : réserve d'eau chaude, soleil prévu et chauffes">

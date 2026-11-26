@@ -1,3 +1,9 @@
+## 1.0.1b3 — Des plages d’eau chaude
+
+### Améliorations
+
+- Chauffe-eau : les moments d’eau chaude deviennent des **plages** (par défaut de 6 h à 9 h et de 19 h à 23 h), réglées dans la page Chauffe-eau sous « Quand on tire l’eau chaude ». On ne sait jamais à la minute quand on prend sa douche : le ballon est assez chaud dès le début de chaque plage, et l’eau du jour est tirée tout au long de la plage. Une heure seule, réglée avant, compte comme une plage d’une heure.
+
 ## 1.0.1b2 — Choisir la prise et la sonde du chauffe-eau
 
 ### Corrections
