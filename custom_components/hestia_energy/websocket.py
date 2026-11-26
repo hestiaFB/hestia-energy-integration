@@ -194,7 +194,7 @@ SETTINGS = vol.Schema({
     **{vol.Optional(k): bool for k in ("notify_day", "notify_week", "notify_month", "notify_leak", "notify_forgot")},
     vol.Optional("groups"): {str: vol.In(hub.GROUPS)},
     vol.Optional("extensions"): {vol.In(_EXTENSIONS): bool},
-    # The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md): every key optional, None the default.
+    # The water heater driven by Hestia (1.0.1b1, docs/chauffe-eau.md): every key optional, None the default.
     vol.Optional("chauffe_eau"): vol.Schema({
         vol.Optional("mode"): vol.In(wh.MODES),
         vol.Optional("appareil"): vol.Any(None, vol.All(str, vol.Length(min=1, max=255))),

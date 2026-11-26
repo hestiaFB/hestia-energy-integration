@@ -440,7 +440,7 @@ def weather_hours(hass: HomeAssistant, place: str | None) -> list[dict]:
     return out
 
 
-# --- Hestia Heating's own cost of the heating (1.0.0b11, « un seul coût ») ------------------------------------------
+# --- Hestia Heating's own cost of the heating (1.0.1b1, « un seul coût ») ------------------------------------------
 
 HEATING_API = "hestia_heating_api"
 HEATING_API_VERSION = 1

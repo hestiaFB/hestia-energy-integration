@@ -1,4 +1,4 @@
-"""The water heater driven by Hestia Energy (1.0.0b11), the Home Assistant side: what is read, kept and published.
+"""The water heater driven by Hestia Energy (1.0.1b1), the Home Assistant side: what is read, kept and published.
 
 The decisions are in engine/water_heater.py (plain Python). Here:
 - every hour (the reports): what is learned from the statistics, and the sun forecast (the Energy page's forecast, else

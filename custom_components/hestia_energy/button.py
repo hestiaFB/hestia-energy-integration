@@ -1,4 +1,4 @@
-"""« Chauffe-eau : chauffer maintenant » (1.0.0b11): until the tank is full (4 hours at most), then the plan again.
+"""« Chauffe-eau : chauffer maintenant » (1.0.1b1): until the tank is full (4 hours at most), then the plan again.
 In « Simulation », the simulated tank is filled: nothing is commanded."""
 from __future__ import annotations
 

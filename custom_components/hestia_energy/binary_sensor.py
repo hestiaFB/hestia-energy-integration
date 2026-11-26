@@ -1,5 +1,5 @@
 """The binary sensors of INTERFACE.md § 1.2: off-peak hours, surplus, peak near the breaker, doubtful data, and since
-1.0.0b11 « Chauffe-eau : chauffer » (docs/chauffe-eau.md), which the household's automation follows."""
+1.0.1b1 « Chauffe-eau : chauffer » (docs/chauffe-eau.md), which the household's automation follows."""
 from __future__ import annotations
 
 from collections.abc import Callable

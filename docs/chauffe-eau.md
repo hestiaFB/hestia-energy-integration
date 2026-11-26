@@ -1,6 +1,6 @@
 # Le chauffe-eau piloté par Hestia Énergie
 
-*Nouveau dans la 1.0.0b11. Il démarre en **Simulation** : rien n’est commandé tant que vous ne le décidez pas.*
+*Nouveau dans la 1.0.1b1. Il démarre en **Simulation** : rien n’est commandé tant que vous ne le décidez pas.*
 
 Un chauffe-eau électrique (un cumulus) est souvent le plus gros consommateur de la maison après le chauffage. Le chauffer au bon moment fait économiser sans rien changer au confort : au soleil quand les panneaux en donnent, en heures creuses sinon, jamais au moment où la maison tire déjà beaucoup.
 

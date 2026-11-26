@@ -138,7 +138,7 @@ class EnergyCoordinator:
         self._failed = False
         # Each past day Hestia Weather could not give, with the day it was asked: asked again the next day only.
         self._cold_asked: dict[date, date] = {}
-        # The water heater driven by Hestia (1.0.0b11): its plan, its reserve, its « Chauffe-eau : chauffer ».
+        # The water heater driven by Hestia (1.0.1b1): its plan, its reserve, its « Chauffe-eau : chauffer ».
         self.heater = WaterHeater(self)
 
     # --- life ---------------------------------------------------------------------------------------------------
@@ -883,7 +883,7 @@ class EnergyCoordinator:
         return live.Candidate("Onduleurs (OpenDTU)", [(reading, 1)], local=self.locality.get(reading.entity_id))
 
     def _read_heating_cost(self, now: datetime) -> None:
-        """The heating's cost as Hestia Heating counts it (1.0.0b11, « un seul coût » : shown as it is, never counted a
+        """The heating's cost as Hestia Heating counts it (1.0.1b1, « un seul coût » : shown as it is, never counted a
         second time here): today so far, yesterday, and the month from the 1st. Read from its memory, every 10 minutes
         (it counts today's every 10 minutes). None without Hestia Heating 1.1 or later."""
         self._heating_cost_at = now

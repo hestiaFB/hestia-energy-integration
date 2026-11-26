@@ -1,5 +1,5 @@
 """The heating's cost read from Hestia Heating (its interface v1, `cout_chauffage`, from its 1.1.0b1) and shown as it
-is: one cost of the heating (1.0.0b11). An invented home, no reading of any real house."""
+is: one cost of the heating (1.0.1b1). An invented home, no reading of any real house."""
 from datetime import date, timedelta
 from pathlib import Path
 import sys
