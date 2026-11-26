@@ -3,7 +3,7 @@ import {customElement,property,state} from 'lit/decorators.js';
 import {hubStyles,modernStyles,pageStyles,listSection,listRow,saveBar,segmented,toggle,moreRow,helpTip,aboutPage,kpis,SOCLE} from './socle/ui';
 
 /* The « Énergie » tab of the Hestia-FB panel, as validated by Frank on 8 Nov. 2026 (hestia-energie/docs/maquette-hub-energie.html,
-   INTERFACE.md § 5): Vue d'ensemble · Sources · Appareils · Réglages · Extensions · Bilan · À propos.
+   INTERFACE.md § 5): Vue d'ensemble · Sources · Appareils · Chauffe-eau (1.0.0b11) · Réglages · Extensions · Bilan · À propos.
    Everything shown comes from the integration (hestia_energy/hub, settings, periods); the tab computes nothing but sums. */
 
 type Hass={callWS:<T>(msg:Record<string,unknown>)=>Promise<T>;states:Record<string,{state:string;attributes:Record<string,unknown>}>;language?:string};
@@ -23,14 +23,29 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
  mois:Period|null;projection:number|null;mois_an_dernier:Period|null;douze_mois:{euros:number|null;du:string;au:string;soleil_couvre:number|null;revendu_euros:number|null}|null;
  bilans:{id:string;titre:string;texte:string;euros:number|null;kwh:number}[];chauffage:{etat:string;mois?:{kwh:number;eur:number|null}|null;poele?:{saison?:{kg:number;eur:number|null}}|null}|null;
  eau:{mois_l:number;mois_euros:number|null}|null;sources:Source[];appareils:{liste:Device[];mois:string|null;part:number|null};extensions:Ext[];groupes:[string,string][];
- tarifs:string|null;notifie:boolean;mis_a_jour?:string;technique?:Tech;pistes:{id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null}[]};
+ tarifs:string|null;notifie:boolean;chauffe_eau?:Heater|null;chauffe_eau_appareils?:{stat:string;nom:string}[];mis_a_jour?:string;technique?:Tech;pistes:{id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null}[]};
+/** The water heater driven by Hestia (1.0.0b11, chauffe_eau.py): what the card shows, and its settings. */
+type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
+type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
+ reserve:number|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
+ soleil_prevu:string|null;plein_le:string|null;bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
+ appris:{days?:number}|null;manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
+type HeaterSettings={mode?:string;appareil?:string|null;prise?:string|null;sonde?:string|null;litres?:number|null;puissance_w?:number|null;heures?:string[];reserve_min?:number;demarrages?:number;consigne?:number};
 type Found<V>={valeur:V|null;source:string|null};
 type Settings={reglages:Record<string,unknown>;trouve:{option:Found<string>;offpeak:Found<[string,string][]>;offpeak_weekend?:Found<string>;kva:Found<number>;offer:Found<string>;
  tarif_bleu:{hp?:number|null;hc?:number|null;base?:number|null;abonnement:number|null};prix_page:Record<string,number>;export_price:Found<number>;water_price:Found<number>;
  margin:Found<number>;sac_kg:number|null;notify:{id:string;nom:string}[];a:{revente:boolean;eau:boolean;poele:boolean;delestage:boolean;un_compteur:boolean}}};
 
 const REPO='https://github.com/hestiaFB/hestia-energy-integration';
-const VERSION='1.0.0b10';
+const VERSION='1.0.0b11';
+const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
+const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
+ ['automatique','Automatique','Hestia décide des chauffes ; votre automatisation allume et éteint la prise.'],
+ ['heures_creuses','Heures creuses','Chauffe pendant les heures creuses, sans plan, comme un contacteur jour/nuit.'],
+ ['vacances','Vacances','Ne chauffe plus, sauf une chauffe complète de la semaine pour l’hygiène.']];
+const HEATER_SOURCE:Record<string,string>={soleil:'au soleil',soleil_partiel:'en partie au soleil',heures_creuses:'en heures creuses',heures_pleines:'en heures pleines',base:'au prix de base'};
+const HEATER_NOW:Record<string,string>={soleil:'Chauffe au soleil',soleil_partiel:'Chauffe, en partie au soleil',heures_creuses:'Chauffe en heures creuses',
+ heures_pleines:'Chauffe en heures pleines',eau_chaude_d_abord:'Chauffe : l’eau chaude d’abord',hygiene:'Chauffe complète de la semaine',boost:'Chauffe demandée'};
 const HA_ENERGY='/config/energy';
 const MONTHS=['janvier','février','mars','avril','mai','juin','juillet','août','septembre','octobre','novembre','décembre'];
 const DAYS=['dimanche','lundi','mardi','mercredi','jeudi','vendredi','samedi'];
@@ -187,7 +202,7 @@ export class HestiaEnergySetup extends LitElement {
   if(!h||!h.pret)return html`<main>${this.head('Énergie',{lead:'Lecture de la page Énergie et de ses statistiques…'})}</main>`;
   const [p,sub]=this.parts();
   const pages:Record<string,()=>TemplateResult>={'':()=>this.overview(h),sources:()=>sub?this.sourcePage(h,sub):this.sourcesPage(h),
-   appareils:()=>sub?this.devicePage(h,sub):this.devicesPage(h),reglages:()=>this.settingsPage(h),
+   appareils:()=>sub?this.devicePage(h,sub):this.devicesPage(h),'chauffe-eau':()=>this.heaterPage(h),reglages:()=>this.settingsPage(h),
    extensions:()=>sub?this.extensionPage(h,sub):this.extensionsPage(h),bilan:()=>this.reviewPage(h),'a-propos':()=>this.aboutPage(h)};
   return html`<main>${(pages[p]??pages[''])()}</main>
    ${saveBar({count:this.count(),busy:this.saving,done:this.saved?'Enregistré':undefined,cancel:()=>{this.draft={};this.hcRows=undefined;},save:()=>void this.save()})}
@@ -319,6 +334,69 @@ export class HestiaEnergySetup extends LitElement {
    ${this.fixedRow(d.corrige)}`;
  }
 
+ /* ── Chauffe-eau (1.0.0b11): the plan Hestia makes, its mode, and what it needs to know. Hestia never commands the
+    heater itself: the household's automation (the blueprint) follows binary_sensor.hestia_energy_chauffe_eau. ── */
+ private heaterVal():HeaterSettings{return (this.val<HeaterSettings|null>('chauffe_eau')??{}) as HeaterSettings;}
+ private setHeater(k:keyof HeaterSettings,v:unknown){this.set('chauffe_eau',{...this.heaterVal(),[k]:v});}
+ private heaterPage(h:Hub){
+  const w=h.chauffe_eau,s=this.heaterVal(),states=this.hass?.states??{},devices=h.chauffe_eau_appareils??[];
+  const mode=s.mode??w?.mode??'simulation',sim=mode==='simulation';
+  const ids=(test:(id:string,a:Record<string,unknown>)=>boolean)=>Object.keys(states).filter(id=>test(id,states[id].attributes)).sort();
+  const plugs=ids(id=>/^(switch|input_boolean|light)\./.test(id)),probes=ids((id,a)=>id.startsWith('water_heater.')||(id.startsWith('sensor.')&&a.device_class==='temperature'));
+  const label=(id:string)=>(states[id]?.attributes.friendly_name as string|undefined)??id;
+  const pick=(k:'prise'|'sonde'|'appareil',l:string,list:[string,string][],none:string)=>html`<select aria-label=${l} @change=${(e:Event)=>{const v=(e.target as HTMLSelectElement).value;this.setHeater(k,v||null);}}>
+    <option value="" ?selected=${!s[k]}>${none}</option>${list.map(([id,n])=>html`<option value=${id} ?selected=${s[k]===id}>${n}</option>`)}</select>`;
+  const numIn=(k:'litres'|'puissance_w'|'consigne',l:string,unit:string,step:number,ph:string)=>html`<input type="number" step=${step} min="0" aria-label=${l} placeholder=${ph}
+    .value=${s[k]!=null?String(s[k]):''} @change=${(e:Event)=>{const v=(e.target as HTMLInputElement).value;this.setHeater(k,v===''?null:Number(v));}}><span class="nk-unit">${unit}</span>`;
+  const hours=s.heures??['07:00','20:00'];
+  const setHours=(l:string[])=>this.setHeater('heures',l.filter(Boolean));
+  const when=(iso:string)=>{const d=new Date(iso),today=new Date(),tomorrow=new Date();tomorrow.setDate(today.getDate()+1);
+   return d.toDateString()===today.toDateString()?hm(d):d.toDateString()===tomorrow.toDateString()?`demain ${hm(d)}`:`${DAYS[d.getDay()]} ${hm(d)}`;};
+  const missing:Record<string,[string,string]>={appareil:['Choisissez le chauffe-eau','Parmi les appareils de la page Énergie, ou indiquez sa prise et sa puissance.'],
+   besoin:['Hestia apprend encore','Le besoin d’eau chaude s’apprend sur quelques jours de mesures ; en attendant, Hestia prend 7 kWh par jour.'],
+   litres:['Indiquez sa contenance','Sur la plaque du chauffe-eau. Sans elle, Hestia l’estime d’après le besoin.'],
+   prise:['Choisissez sa prise','Votre automatisation en a besoin pour allumer et éteindre le chauffe-eau.']};
+  const todo=(w?.manque??(!w?['appareil']:[])).filter(k=>missing[k]).map(k=>listRow({label:html`<b>${missing[k][0]}</b>`,sub:missing[k][1],level:k==='besoin'?undefined:'todo'}));
+  const pill:[string,string]=sim?['wait','Simulation']:w?.chauffer?['run',HEATER_NOW[w.raison]??'Chauffe']:['ok',mode==='vacances'?'Vacances':'Piloté'];
+  const days=(w?.bilan??[]).slice().reverse();
+  return html`${this.head('Chauffe-eau',{pill:w?pill:undefined,lead:w?.phrase||(w?undefined:'Hestia décide quand chauffer : au soleil quand il y en a, en heures creuses sinon, sans jamais manquer d’eau chaude.'),
+    help:'Hestia ne commande jamais le chauffe-eau. Il allume ou éteint « binary_sensor.hestia_energy_chauffe_eau » ; c’est votre automatisation qui suit et commande la prise. En Simulation, elle ne fait rien.'})}
+   ${w?kpis([{value:w.reserve!=null?w.reserve+' %':'—',label:'d’eau chaude, estimée'},
+     {value:w.chauffer?(w.jusqu_a?'jusqu’à '+hm(new Date(w.jusqu_a)):'en cours'):w.prochaine_chauffe?when(w.prochaine_chauffe):'—',label:w.chauffer?'chauffe':'prochaine chauffe'},
+     {value:w.cout_prevu!=null?eur(w.cout_prevu):'—',label:w.kwh_prevus!=null?`prévus pour ${kwh(w.kwh_prevus)}`:'prévus'}]):nothing}
+   ${todo.length?listSection('À régler',todo):nothing}
+   ${w?.plan.length?listSection('Les prochaines chauffes',w.plan.map(r=>listRow({label:`${when(r.debut)} – ${hm(new Date(r.fin))}`,sub:`${cap(HEATER_SOURCE[r.source]??r.source)}, ${kwh(r.kwh)}.`,value:html`<span class="money">${eur(r.euros)}</span>`})),
+     {help:`Le plan des 36 prochaines heures, refait toutes les 5 minutes. ${w.soleil_prevu==='prevision'?'Le soleil prévu vient de la prévision de la page Énergie.':w.soleil_prevu==='nuages'?'Le soleil prévu vient des nuages annoncés par Hestia Météo et de ce que vos panneaux produisent par beau temps.':w.soleil_prevu==='habitude'?'Sans prévision, Hestia prend le soleil habituel de ces derniers jours.':''} La veille, Hestia ne compte que sur 70 % du soleil prévu.`}):nothing}
+   ${listSection('Le mode',[listRow({label:'Mode',control:true,sub:HEATER_MODES.find(m=>m[0]===mode)?.[2],
+     value:segmented('Mode',HEATER_MODES.map(m=>[m[0],m[1]]) as [string,string][],mode,v=>this.setHeater('mode',v))})],
+     {help:'Commencez en Simulation : regardez le plan quelques jours, puis passez en Automatique. Le bouton « Chauffe-eau : chauffer maintenant » demande une chauffe jusqu’au plein.'})}
+   ${listSection('Votre chauffe-eau',[
+    listRow({label:'Le compteur',control:true,sub:'Sa consommation, dans la page Énergie de Home Assistant.',value:pick('appareil','Le compteur',devices.map(d=>[d.stat,d.nom]),'Trouvé par son nom')}),
+    listRow({label:'La prise',control:true,sub:s.prise?(w?.prise_etat?`Elle est sur « ${w.prise_etat==='on'?'allumée':w.prise_etat==='off'?'éteinte':w.prise_etat} ».${w.suit===false?' Elle ne suit pas Hestia : vérifiez l’automatisation.':''}`:undefined):'Celle que votre automatisation allume et éteint.',
+     value:pick('prise','La prise',plugs.map(id=>[id,label(id)]),'Aucune')}),
+    listRow({label:'Sa contenance',control:true,value:numIn('litres','Sa contenance','litres',10,'200')}),
+    listRow({label:'Sa puissance',control:true,sub:w?.puissance_kw?`Mesurée : ${num(w.puissance_kw*1000)} W.`:undefined,value:numIn('puissance_w','Sa puissance','W',100,w?.puissance_kw?String(Math.round(w.puissance_kw*1000)):'2400')}),
+    listRow({label:'Une sonde de température',control:true,sub:'Facultative : avec elle, la réserve est mesurée au lieu d’être estimée.',value:pick('sonde','Une sonde de température',probes.map(id=>[id,label(id)]),'Aucune')}),
+    ...(s.sonde?[listRow({label:'Sa température de consigne',control:true,value:numIn('consigne','Sa température de consigne','°C',1,'60')})]:[]),
+   ],{help:'Laissés vides, la puissance et le besoin s’apprennent sur les 4 dernières semaines de mesures.'})}
+   ${listSection('L’eau chaude',[
+    listRow({label:'Les heures où l’on en a besoin',control:true,sub:'Les douches et les bains : le chauffe-eau est assez chaud avant.',
+     value:html`<span class="hc">${hours.map((x,i)=>html`<span><input type="time" aria-label=${'Heure '+(i+1)} .value=${x} @change=${(e:Event)=>{const l=[...hours];l[i]=(e.target as HTMLInputElement).value;setHours(l);}}>
+      ${hours.length>1?html`<button type="button" class="nk-reset-s" @click=${()=>{const l=[...hours];l.splice(i,1);setHours(l);}}>Retirer</button>`:nothing}</span>`)}</span>`}),
+    ...(hours.length<6?[listRow({label:'Ajouter une heure',go:()=>setHours([...hours,'12:00'])})]:[]),
+    listRow({label:'Garder au moins',control:true,sub:'La réserve sous laquelle Hestia chauffe tout de suite, même en heures pleines.',
+     value:html`<select aria-label="Garder au moins" @change=${(e:Event)=>this.setHeater('reserve_min',Number((e.target as HTMLSelectElement).value)/100)}>${[10,20,30,40,50,60].map(v=>html`<option value=${v} ?selected=${Math.round((s.reserve_min??0.3)*100)===v}>${v} %</option>`)}</select>`}),
+    listRow({label:'Démarrages par jour, au plus',control:true,sub:'Pour ménager la résistance et le relais de la prise.',
+     value:html`<select aria-label="Démarrages par jour" @change=${(e:Event)=>this.setHeater('demarrages',Number((e.target as HTMLSelectElement).value))}>${[1,2,3,4,5,6,8].map(v=>html`<option value=${v} ?selected=${(s.demarrages??4)===v}>${v}</option>`)}</select>`}),
+   ])}
+   ${listSection('L’automatisation',[listRow({label:'Importer le blueprint',sub:'« Piloter le chauffe-eau avec Hestia Énergie » : il allume et éteint la prise comme le dit Hestia, et ne fait rien en Simulation. En option, il revient aux heures creuses si Hestia ne répond plus.',
+     value:html`<a class="ext-act" href=${BLUEPRINT} target="_blank" rel="noreferrer">Importer</a>`})])}
+   ${days.length?listSection('Les derniers jours',days.map(d=>{const day=new Date(d.jour+'T12:00');
+     return listRow({label:cap(`${DAYS[day.getDay()]} ${dayOf(day)}`),value:html`<span class="money">${eur(d.reel_eur)}</span>`,
+      sub:`${kwh(d.reel_kwh)}. Avec le plan de Hestia : ${eur(d.hestia_eur)} ; tout en heures creuses : ${eur(d.hc_eur)}.${d.prix_inconnu?' Prix en partie inconnu.':''}`});}),
+     {help:'Ce que le chauffe-eau a coûté chaque jour, comparé à ce que le plan de Hestia aurait coûté et à une chauffe toute en heures creuses.'}):nothing}`;
+ }
+
  /* ── Réglages (H7) ── */
  private settingsPage(h:Hub){
   const s=this.settings;
@@ -365,6 +443,8 @@ export class HestiaEnergySetup extends LitElement {
    ${a.poele?listSection('Le poêle',[listRow({label:'Prix du sac de granulés',control:true,sub:'Les achats saisis dans Suivi Stock Pellet passent avant.',
      value:html`<input type="number" step="0.01" min="0" aria-label="Prix du sac" placeholder="—" .value=${this.val('bag_price')!=null?String(this.val('bag_price')):''} @change=${(e:Event)=>{const v=(e.target as HTMLInputElement).value;this.set('bag_price',v===''?null:Number(v));}}><span class="nk-unit">€ le sac${f.sac_kg?` de ${num(f.sac_kg)} kg`:''}</span>`})]):nothing}
    ${a.eau?listSection('L’eau',[listRow({label:'Prix du mètre cube',control:true,value:numIn('water_price','€ le m³',0.01,f.water_price.valeur,f.water_price.source,'Prix du mètre cube')})]):nothing}
+   ${listSection('Le chauffe-eau',[listRow({label:h.chauffe_eau?'Piloter le chauffe-eau':'Un chauffe-eau sur une prise',
+     sub:h.chauffe_eau?`Mode ${HEATER_MODES.find(m=>m[0]===h.chauffe_eau!.mode)?.[1]??h.chauffe_eau.mode}.`:'Hestia peut décider de ses chauffes : au soleil, en heures creuses, selon la météo de demain.',go:()=>this.go('chauffe-eau')})])}
    ${listSection('Notifications',[
     listRow({label:'Envoyer à',control:true,sub:service?undefined:'Les bilans restent dans les cartes et ici.',value:html`<select aria-label="Envoyer à" @change=${(e:Event)=>{const v=(e.target as HTMLSelectElement).value;this.set('notify_service',v||null);}}>
       <option value="" ?selected=${!service}>Personne</option>${f.notify.map(n=>html`<option value=${n.id} ?selected=${service===n.id}>${n.nom}</option>`)}</select>${service?nothing:html`<span class="nk-def">par défaut</span>`}`}),

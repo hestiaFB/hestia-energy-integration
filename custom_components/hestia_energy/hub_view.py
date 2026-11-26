@@ -575,6 +575,10 @@ def build(hass, c) -> dict:
         "groupes": [[k, hub.GROUP_NAMES[k]] for k in hub.GROUPS],
         "mis_a_jour": d.get("mis_a_jour"), "tarifs": (c.table or {}).get("version"),
         "notifie": bool(c.settings.get("notify_service")),
+        # The water heater driven by Hestia (1.0.0b11): its page, and the devices of the Energy page to choose it from.
+        "chauffe_eau": d.get("chauffe_eau"),
+        "chauffe_eau_appareils": [{"stat": m.stat, "nom": m.name or c.device_names.get(m.stat) or m.stat}
+                                  for m in (c.page.devices if c.page else [])],
     }
 
 

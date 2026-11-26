@@ -45,7 +45,15 @@ type View={pret:boolean;palier:number;equipement:{direct?:boolean;soleil?:boolea
  appareils_jour?:{appareils:{nom:string;kwh:number;euros:number|null}[];mesure_kwh:number;maison_kwh:number;sans_prise_kwh:number|null;prix_moyen:number|null}|null;
  pointe?:{h:number;kw:number;part:number|null}|null;
  chauffage?:{etat:string;mois?:Heat|null;saison?:(Heat&{du:string})|null;euros_par_degre?:number|null;poele?:Stove|null};
- usage?:Usage|null};
+ usage?:Usage|null;chauffe_eau?:Heater|null};
+/** The water heater driven by Hestia (1.0.0b11, docs/chauffe-eau.md): its plan, its reserve, its mode. `courbe`: each
+    half hour from now, [start, reserve %, sun to spare forecast kW, price, off-peak 1/0, the heating's source or null]. */
+type Run={debut:string;fin:string;source:string;kwh:number;euros:number};
+type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
+ reserve:number|null;reserve_kwh:number|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:Run[];kwh_prevus:number|null;cout_prevu:number|null;
+ manque_a:string|null;courbe:[string,number,number,number|null,number,string|null][];soleil_prevu:string|null;plein_le:string|null;heures:number[];reserve_min:number;
+ bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
+ manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 /** « Votre contrat, bien utilisé » (engine/habits.py): the last 12 months. */
 type Device={nom:string;type:string;kwh:number;soleil:number;nuit:number;pleines:number;pleines_kwh:number;euros_an:number};
 type Usage={jours:number;part_hc:number;seuil_hc:number|null;part_hc_chauffe_eau:number|null;base_de_plus:number|null;
@@ -53,7 +61,7 @@ type Usage={jours:number;part_hc:number;seuil_hc:number|null;part_hc_chauffe_eau
  puissance?:{kva:number;jours:number;pointe_w:number;plus_bas:{kva:number;jours_au_dessus:number;euros_an:number|null}}|null};
 type Config={type:string;card?:string;name?:string};
 
-const RUBRICS=['soleil','chauffage','veille','eau','appareils','pointe','contrat'] as const;
+const RUBRICS=['soleil','chauffage','veille','eau','appareils','pointe','contrat','chauffe_eau'] as const;
 /** Advice « à froid » (maquette des cartes 3): a gesture, why, and the euros at stake a year or a winter. */
 type Piste={id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null;rubrique:string|null;
  nom?:string;maintenant?:string;mieux?:string;gain?:number;sous?:string;profil?:[number,number,number][];mieux_heures?:[number,number,string][];zones?:[number,number,string][];departs?:[number,number][];jours?:number;lancer?:number|null};
@@ -459,6 +467,9 @@ class HestiaEnergyCard extends LitElement {
   const p=v.pointe;
   if(p)out.push(this._go('pointe','bolt','--nw-grid','Pointe · aujourd\'hui',kw(p.kw*1000),'kW au plus fort',
    v.contrat?.kva?`Sur ${v.contrat.kva} kVA : ${p.part!=null&&p.part>=.7?'près de la limite':'de la marge'}.`:'L\'heure la plus chargée.'));
+  const w=v.chauffe_eau;
+  if(w)out.push(this._go('chauffe_eau','heater','--nw-water',`Chauffe-eau · ${w.simulation?'simulation':'piloté'}`,w.reserve!=null?String(w.reserve):'—','% de réserve',
+   w.chauffer?HEAT_NOW[w.raison]??'Il chauffe.':w.prochaine_chauffe?`Prochaine chauffe à ${clock(new Date(w.prochaine_chauffe))}.`:'Pas de chauffe prévue.'));
   const c=v.contrat;
   if(c?.option==='hphc'&&c.part_hc!=null)out.push(this._go('contrat','doc','--nw-benefit','Contrat · ce mois-ci',String(Math.round(c.part_hc*100)),
    atNight(offpeak(v.heures_creuses))?'% la nuit':'% en heures creuses','de vos achats en heures creuses.'));
@@ -610,6 +621,7 @@ class HestiaEnergyCard extends LitElement {
    case 'eau':return this._water(v,over);
    case 'appareils':return this._devices(v,over);
    case 'pointe':return this._peak(v,over);
+   case 'chauffe_eau':return this._heater(v,over);
    default:return this._contract(v,over);
   }
  }
@@ -732,6 +744,34 @@ class HestiaEnergyCard extends LitElement {
      <div class="nw-legend"><span><i style="--c:var(--nw-grid)"></i>pris au réseau, en moyenne sur l'heure</span>${ranges.length?html`<span><i style="--c:color-mix(in oklab, var(--nw-cold) 40%, transparent)"></i>heures creuses</span>`:nothing}</div>`,{wide:true})}</div>`;
  }
 
+ private _heater(v:View,over:boolean){
+  const w=v.chauffe_eau,head={ic:'heater',c:'--nw-water',subject:'Chauffe-eau',period:'les prochaines heures',over};
+  if(!w)return this._ans({...head,msg:'Pas de chauffe-eau dans la page Énergie',why:'Ajoutez sa prise mesurée dans la page Énergie de Home Assistant (consommation individuelle) : Hestia préparera son plan de chauffe.'});
+  const pill:[string,string]=w.simulation?['Simulation : rien n’est commandé','--nw-watch']:w.chauffer?['Chauffe','--nw-act']:w.raison==='plein'?['Plein','--nw-benefit']:['En attente','--nw-cold'];
+  const runs=w.plan.slice(0,5);
+  const sun=w.soleil_prevu==='prevision'?'la prévision solaire de la page Énergie':w.soleil_prevu==='nuages'?'les nuages prévus par Hestia Météo':w.soleil_prevu==='habitude'?'la production habituelle des panneaux':null;
+  const plan=this._enc('Le plan',sun?html`Refait toutes les 5 minutes, avec ${sun} et vos prix.`:'Refait toutes les 5 minutes, avec vos prix.',heaterChart(w),{wide:true,
+   foot:w.kwh_prevus!=null?html`Prévu : <b>${kwh(w.kwh_prevus)} kWh</b>${w.cout_prevu!=null?html`, <b>${eur(w.cout_prevu)} €</b>`:''} d'ici demain soir.`:nothing});
+  const next=runs.length?this._enc('Les prochaines chauffes',nothing,html`<div class="hb list">${runs.map(r=>html`<span class="n"><i class="dot" style="--c:var(${SOURCE_C[r.source]??'--nw-home'})"></i>${clock(new Date(r.debut))} – ${clock(new Date(r.fin))}<small>${SOURCE_W[r.source]??''}</small></span>
+    <span class="v">${kwh(r.kwh)} kWh<small>${eur(r.euros)} €</small></span>`)}</div>`):nothing;
+  const days=w.bilan.filter(d=>d.reel_kwh>=0.05||d.hestia_kwh>=0.05);
+  const real=days.reduce((s,d)=>s+d.reel_eur,0),hestia=days.reduce((s,d)=>s+d.hestia_eur,0),hc=days.reduce((s,d)=>s+d.hc_eur,0);
+  const review=days.length?this._enc(`Les ${days.length} dernier${days.length>1?'s':''} jour${days.length>1?'s':''}`,w.simulation
+    ?html`Votre chauffe-eau a coûté <b>${eur(real)} €</b>. En suivant le plan, il aurait coûté <b>${eur(hestia)} €</b>.`
+    :html`Avec le plan, <b>${eur(hestia)} €</b>. En heures creuses simples, la même eau aurait coûté <b>${eur(hc)} €</b>.`,
+    hb(days.map(d=>({n:dayMonth(d.jour),v:w.simulation?Math.max(d.reel_eur,d.hestia_eur):d.hestia_eur,txt:`${eur(d.hestia_eur)} €`,
+      sub:w.simulation?`réel ${eur(d.reel_eur)} €`:`${kwh(d.hestia_kwh)} kWh`})),'--nw-water'),{foot:w.simulation?'Le plan est calculé sur la même maison, minute par minute : rien n’a été commandé.':nothing}):nothing;
+  const todo:string[]=[];
+  if(w.manque.includes('litres'))todo.push('le volume du ballon, pour une réserve juste');
+  if(w.manque.includes('prise'))todo.push('la prise qui le commande');
+  if(w.manque.includes('besoin'))todo.push('quelques jours encore, pour apprendre combien d’eau chaude la maison tire');
+  const settings=this._enc('Réglages',html`Mode <b>${MODE_W[w.mode]??w.mode}</b>${w.simulation?' : Hestia montre ce qu’il ferait, votre automatisation ne fait rien.':'.'}
+    ${w.suit===false?html` <b>La prise ne suit pas le plan</b> : vérifiez l’automatisation.`:nothing}${todo.length?html` Il manque ${todo.join(', ')}.`:nothing}`,nothing,
+   {foot:html`<a class="to-hub" href="/hestia/energie/chauffe-eau" @click=${toHub}>Régler le chauffe-eau ›</a>`});
+  return html`${this._ans({...head,pill,val:w.reserve!=null?String(w.reserve):'—',unit:'%',cap:`d'eau chaude en réserve${w.reserve_kwh!=null?`, ${kwh(w.reserve_kwh)} kWh sur ${kwh(w.capacite_kwh)}`:''}`,why:w.phrase})}
+   <div class="encs">${plan}${next}${review}${settings}</div>`;
+ }
+
  private _contract(v:View,over:boolean){
   const c=v.contrat,now=new Date(),head={ic:'doc',c:'--nw-benefit',subject:'Contrat',period:'ce mois-ci',over};
   const ranges=offpeak(v.heures_creuses),night=atNight(ranges);
@@ -768,6 +808,40 @@ class HestiaEnergyCard extends LitElement {
     ${prices}${pays}${this._machines(v)}
    </div>`;
  }
+}
+
+/** What the water heater does now, in a few words (the tile of « En détail »). */
+const HEAT_NOW:Record<string,string>={soleil:'Il chauffe au soleil.',soleil_partiel:'Il chauffe, en partie au soleil.',heures_creuses:'Il chauffe en heures creuses.',
+ heures_pleines:'Il chauffe en heures pleines.',eau_chaude_d_abord:'Il chauffe : l’eau chaude d’abord.',hygiene:'Chauffe complète de la semaine.',boost:'Chauffe demandée.'};
+/** The colour of a heating by its source: the sun, the off-peak night, the peak price. */
+const SOURCE_C:Record<string,string>={soleil:'--nw-sun',soleil_partiel:'--nw-act',heures_creuses:'--nw-cold',heures_pleines:'--nw-peak',base:'--nw-home'};
+const SOURCE_W:Record<string,string>={soleil:'au soleil',soleil_partiel:'en partie au soleil',heures_creuses:'en heures creuses',heures_pleines:'en heures pleines',base:'au prix de base'};
+const MODE_W:Record<string,string>={simulation:'Simulation',automatique:'Automatique',heures_creuses:'Heures creuses seules',vacances:'Vacances'};
+
+/** The plan of the next hours, drawn to scale: the reserve (line), the sun to spare forecast (area), the heatings
+    (blocks by source), the price of each half hour (band), the hot-water times. */
+function heaterChart(w:Heater){
+ const pts=w.courbe;if(pts.length<2)return nothing;
+ const W=640,L=30,R=8,T=14,H=130,band=T+H+8,X=(i:number)=>L+(W-L-R)*i/pts.length,y=(p:number)=>T+H-Math.max(0,Math.min(100,p))/100*H;
+ const sunMax=Math.max(3,...pts.map(p=>p[2])),ys=(k:number)=>T+H-k/sunMax*H*0.8;
+ let area=`M${X(0)},${T+H}`;pts.forEach((p,i)=>{area+=` L${X(i)+(X(1)-X(0))/2},${ys(p[2])}`;});area+=` L${X(pts.length)},${T+H} Z`;
+ let line='';pts.forEach((p,i)=>{line+=`${i?' L':'M'}${X(i)+(X(1)-X(0))/2},${y(p[1])}`;});
+ const ticks:TemplateResult[]=[],marks:TemplateResult[]=[];
+ pts.forEach((p,i)=>{const d=new Date(p[0]),m=d.getHours()*60+d.getMinutes();
+  if(m%360===0)ticks.push(svg`<text x=${X(i)} y=${band+22} text-anchor="middle" class="tk">${m===0?'minuit':hour(d.getHours())}</text>`);
+  if(w.heures.some(t=>t>=m&&t<m+30))marks.push(svg`<line x1=${X(i)} x2=${X(i)} y1=${T} y2=${T+H} class="hw"></line><text x=${X(i)+3} y=${T+9} class="hwl">eau chaude</text>`);});
+ const sunny=pts.some(p=>p[2]>0.05);
+ return html`<svg class="whc" viewBox="0 0 ${W} ${band+28}" role="img" aria-label="Le plan des prochaines heures : réserve d'eau chaude, soleil prévu et chauffes">
+  ${[0,50,100].map(p=>svg`<line x1=${L} x2=${W-R} y1=${y(p)} y2=${y(p)} class="gl"></line><text x=${L-5} y=${y(p)+3} text-anchor="end" class="tk">${p} %</text>`)}
+  ${sunny?svg`<path d=${area} class="sun"></path>`:nothing}
+  ${marks}
+  <line x1=${L} x2=${W-R} y1=${y(w.reserve_min*100)} y2=${y(w.reserve_min*100)} class="min"></line>
+  ${pts.map((p,i)=>p[5]?svg`<rect x=${X(i)+.5} y=${T+H-18} width=${X(1)-X(0)-1} height="18" rx="2" style="fill:var(${SOURCE_C[p[5]]??'--nw-home'})"></rect>`:nothing)}
+  <path d=${line} class="res"></path>
+  ${pts.map((p,i)=>svg`<rect x=${X(i)} y=${band} width=${X(1)-X(0)+.3} height="7" class="pb" style="fill:var(${p[4]?'--nw-cold':'--nw-peak'})"></rect>`)}
+  ${ticks}<text x=${L} y=${T-4} class="tk">maintenant</text></svg>
+  <div class="nw-legend"><span><i style="--c:var(--nw-water)"></i>réserve d'eau chaude</span>${sunny?html`<span><i style="--c:color-mix(in oklab, var(--nw-sun) 45%, transparent)"></i>soleil en trop prévu</span>`:nothing}
+   <span><i style="--c:var(--nw-sun)"></i>chauffe au soleil</span><span><i style="--c:var(--nw-cold)"></i>en heures creuses</span><span><i style="--c:var(--nw-peak)"></i>en heures pleines</span></div>`;
 }
 
 if(!customElements.get('hestia-energy-card'))customElements.define('hestia-energy-card',HestiaEnergyCard);

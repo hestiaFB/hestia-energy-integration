@@ -17,6 +17,7 @@ export const FORMATS:[string,string,string,string][]=[
  ['appareils','mdi:power-plug','Appareils','ce que chaque appareil a consommé aujourd’hui'],
  ['pointe','mdi:transmission-tower','Pointe','la plus forte puissance prise aujourd’hui'],
  ['contrat','mdi:file-document-outline','Contrat','vos heures creuses et vos prix, ce mois-ci'],
+ ['chauffe_eau','mdi:water-boiler','Chauffe-eau','son plan de chauffe et sa réserve d’eau chaude'],
 ];
 
 const follow=(e:MouseEvent)=>{e.preventDefault();history.pushState(null,'',(e.currentTarget as HTMLAnchorElement).getAttribute('href')??'/hestia/energie');
