@@ -39,7 +39,7 @@ type Settings={reglages:Record<string,unknown>;trouve:{option:Found<string>;offp
  margin:Found<number>;sac_kg:number|null;notify:{id:string;nom:string}[];a:{revente:boolean;eau:boolean;poele:boolean;delestage:boolean;un_compteur:boolean}}};
 
 const REPO='https://github.com/hestiaFB/hestia-energy-integration';
-const VERSION='1.0.1b4';
+const VERSION='1.0.1b5';
 const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
 const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
  ['automatique','Automatique','Hestia décide des chauffes ; votre automatisation allume et éteint la prise.'],

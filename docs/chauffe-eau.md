@@ -18,7 +18,7 @@ Sans chauffe-eau mesuré, indiquez sa prise et sa puissance dans la page Chauffe
 
 Toutes les 5 minutes, Hestia refait le plan des 36 prochaines heures, quart d’heure par quart d’heure. Elle cherche la façon la moins chère d’avoir assez d’eau chaude pendant les plages où vous en tirez (par défaut de 6 h à 9 h et de 19 h à 23 h).
 
-Ces plages se règlent dans la page Chauffe-eau, sous « Quand on tire l’eau chaude » : par exemple le matin de 6 h à 9 h pour les douches, le soir de 19 h à 23 h. Le ballon doit être assez chaud dès le début de chacune. L’eau du jour est partagée à parts égales entre les plages et tirée régulièrement tout au long de chacune. Un quart du besoin compte comme les pertes du ballon, réparties sur toute la journée. Une heure seule (réglée avant la 1.0.1b3) compte comme une plage d’une heure.
+Ces plages se règlent dans la page Chauffe-eau, sous « Quand on tire l’eau chaude » : par exemple le matin de 6 h à 9 h pour les douches, le soir de 19 h à 23 h. Le ballon doit être assez chaud dès le début de chacune : à l’heure du début, la réserve garde son minimum **plus** l’eau de la plage, chauffée avant. Si le minimum tient déjà, ce complément ne se paie jamais en heures pleines : seulement au prix le plus bas du contrat ou au soleil (depuis la 1.0.1b5). L’eau du jour est partagée à parts égales entre les plages et tirée régulièrement tout au long de chacune. Un quart du besoin compte comme les pertes du ballon, réparties sur toute la journée. Une heure seule (réglée avant la 1.0.1b3) compte comme une plage d’une heure.
 
 Pour chaque quart d’heure, elle connaît :
 
@@ -40,6 +40,7 @@ La veille, Hestia ne compte que sur 70 % du soleil prévu (90 % dans les 3 proch
 Les autres règles :
 
 - une chauffe dure au moins 30 minutes, et le chauffe-eau démarre au plus 4 fois par jour (réglable) ;
+- deux chauffes proches sont réunies en une, même pour quelques centimes de plus (1 centime le kWh au plus) ;
 - une fois par semaine, le ballon est chauffé jusqu’au plein (hygiène) ;
 - un jour rouge Tempo, la chauffe attend la nuit ;
 - si la maison approche du disjoncteur, la chauffe s’arrête tout de suite.
