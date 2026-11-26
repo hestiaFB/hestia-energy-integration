@@ -22,6 +22,11 @@ class EnergySensorDescription(SensorEntityDescription):
     exists: Callable[[dict], bool] = lambda d: True
 
 
+def _reserve(w: dict):
+    real = w.get("reserve_reelle")
+    return real if real is not None else w.get("reserve")
+
+
 def _direct(d: dict) -> dict:
     return d.get("direct") or {}
 
@@ -101,8 +106,10 @@ SENSORS = (
     EnergySensorDescription(
         key="chauffe_eau_reserve", translation_key="chauffe_eau_reserve", native_unit_of_measurement="%",
         state_class=SensorStateClass.MEASUREMENT, icon="mdi:water-percent",
-        value=lambda d: (d.get("chauffe_eau") or {}).get("reserve"),
-        attributes=lambda d: {k: (d.get("chauffe_eau") or {}).get(k) for k in ("reserve_kwh", "capacite_kwh", "besoin_kwh", "plein_le")},
+        # In Simulation, the household's own tank (1.0.1b5); the plan's one stays in the attributes.
+        value=lambda d: _reserve(d.get("chauffe_eau") or {}),
+        attributes=lambda d: {k: (d.get("chauffe_eau") or {}).get(k) for k in ("reserve_kwh", "capacite_kwh", "besoin_kwh", "plein_le")}
+        | {"reserve_plan": (d.get("chauffe_eau") or {}).get("reserve")},
         exists=lambda d: bool(d.get("chauffe_eau_trouve"))),
     EnergySensorDescription(
         key="chauffe_eau_prochaine", translation_key="chauffe_eau_prochaine", device_class=SensorDeviceClass.TIMESTAMP,

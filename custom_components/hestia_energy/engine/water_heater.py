@@ -11,8 +11,10 @@ How it decides (docs/chauffe-eau.md, the proposal validated by Frank on 26 Nov. 
 2. The price of each quarter hour up to tomorrow evening: in the sun to spare, a kWh costs the resale lost; the rest the
    contract's price at that time (peak / off-peak, the Tempo colour). Above the breaker, forbidden.
 3. Prudence with the sun: the sun forecast counts for less the further away it is (70 % the evening before).
-4. The plan: the cheapest quarter hours that keep the reserve above its minimum at every moment, in runs of at least
-   30 minutes, with few starts a day. The sun nearly free is taken while the tank is not full.
+4. The plan: the cheapest quarter hours that keep the reserve above its minimum at every moment, and that have it ready
+   at the start of each hot-water range (its minimum plus the water of that range: no heating left for the range
+   itself), in runs of at least 30 minutes, with few starts a day; heatings side by side rather than apart, for a few
+   centimes (1.0.1b5). The sun nearly free is taken while the tank is not full.
 5. Hot water first: when nothing cheaper is left before the reserve runs short, the heater heats now, whatever the price.
 
 Plain Python: no Home Assistant here. The coordinator gives the slots (prices, sun, house), the reserve and the settings.
@@ -29,7 +31,10 @@ SLOT_H = 0.25
 HORIZON = timedelta(hours=36)
 # The modes of the select « Chauffe-eau : mode ». Simulation first: nothing is commanded until the household says so.
 SIMULATION, AUTO, OFFPEAK, AWAY = "simulation", "automatique", "heures_creuses", "vacances"
-MODES = (SIMULATION, AUTO, OFFPEAK, AWAY)
+# Apprentissage (1.0.1b5, Frank): heats in the off-peak hours as before, without the plan, while Hestia learns the tank
+# (its 100 % seen when its thermostat cuts, its power, its day's need); it says when Automatique can take over.
+LEARN = "apprentissage"
+MODES = (SIMULATION, LEARN, AUTO, OFFPEAK, AWAY)
 # The settings of the water heater, with their defaults (a setting, never a constant, when it depends on the home).
 DEFAULTS = {"mode": SIMULATION, "appareil": None, "prise": None, "sonde": None, "litres": None, "puissance_w": None,
             "heures": ["06:00-09:00", "19:00-23:00"], "reserve_min": 0.3, "demarrages": 4, "consigne": 60}
@@ -39,8 +44,10 @@ LOSS_SHARE = 0.25                  # of the day's need, the tank's losses, sprea
 DRAW_HOURS = 1.0                   # a hot-water time given alone (« 07:00 ») draws over this long
 HYGIENE_DAYS = 7                   # a full heating at least once a week (the tank's thermostat cut reached)
 LEARN_DAYS = 28
+BUSY = 0.8                         # the need learned is a busy day: 8 days in 10 draw no more (1.0.1b5; the median before)
 MIN_DAYS = 7
 MIN_ON_KW = 0.3                    # the heater heats above this
+BESIDE_EUR = 0.01                  # € a kWh worth paying to heat next to a heating already planned (one run, not two)
 
 
 def _prudence(lead: timedelta) -> float:
@@ -54,7 +61,7 @@ def _prudence(lead: timedelta) -> float:
 @dataclass(frozen=True)
 class Learned:
     power_kw: float | None             # its power when it heats
-    need_week_kwh: float | None        # its energy a weekday (draws and losses), the median of the last 4 weeks
+    need_week_kwh: float | None        # its energy a weekday (draws and losses): a busy day of the last 4 weeks (BUSY)
     need_weekend_kwh: float | None
     days: int                          # days the need was learned on
     base_kw: tuple[float, ...] = ()    # the rest of the home, each local hour (0 to 23), kW
@@ -73,6 +80,12 @@ class Learned:
 
 def _round(value: float | None, n: int = 2) -> float | None:
     return None if value is None else round(value, n)
+
+
+def busy_day(values: list[float]) -> float:
+    """A busy day: the day that BUSY of the days do not pass (a median day left the tank empty one evening in two)."""
+    ordered = sorted(values)
+    return ordered[max(0, math.ceil(BUSY * len(ordered)) - 1)]
 
 
 def learn(heater: list[tuple[datetime, float]], home: list[tuple[datetime, float]], sun: list[tuple[datetime, float]],
@@ -103,8 +116,8 @@ def learn(heater: list[tuple[datetime, float]], home: list[tuple[datetime, float
         strong.sort()
         power = statistics.median(strong[int(len(strong) * 0.8):])
     used = len(week) + len(weekend)
-    need_week = statistics.median(week) if len(week) >= 3 else None
-    need_weekend = statistics.median(weekend) if len(weekend) >= 2 else None
+    need_week = busy_day(week) if len(week) >= 3 else None
+    need_weekend = busy_day(weekend) if len(weekend) >= 2 else None
     if used < MIN_DAYS:
         need_week = need_weekend = None
     by_hour = _rest_of_home(heater, home, tz, now - timedelta(days=14))
@@ -232,6 +245,17 @@ def draw_kw(local: datetime, need_kwh: float, times) -> float:
     return losses + sum(share / (length / 60) for start, length in ranges if 0 <= (minute - start) % 1440 < length)
 
 
+def ready_before(local: datetime, need_kwh: float, times) -> float:
+    """The water of the hot-water ranges starting in the quarter hour from `local` (kWh), wanted in the tank by then."""
+    ranges = _as_ranges(times)
+    if not ranges:
+        return 0.0
+    minute = local.hour * 60 + local.minute
+    starting = [r for r in ranges if 0 <= (r[0] - minute) % 1440 < 15]
+    share = need_kwh * (1 - LOSS_SHARE) / len(ranges)
+    return share * len(starting)
+
+
 # --- the reserve, followed minute by minute ---------------------------------------------------------------------
 
 @dataclass
@@ -285,6 +309,7 @@ class Slot:
     draw_kwh: float            # what the household draws during the slot
     offpeak: bool = False
     sun_forecast_kw: float = 0.0   # the sun to spare forecast, before prudence (for the card)
+    ready_kwh: float = 0.0         # a hot-water range starts at the end of this slot: its water, wanted ready then
 
 
 @dataclass(frozen=True)
@@ -394,21 +419,27 @@ def make_plan(slots: list[Slot], start_kwh: float, s: Settings, keep_on: bool = 
     # Sun slots that heated nothing (the tank already full then) are let go.
     chosen = [c and e > 0.01 for c, e in zip(chosen, energy)]
 
-    # The reserve kept above its minimum: at each first moment it runs short, the cheapest quarter hour before it.
+    # The reserve kept above its minimum, and ready at the start of each hot-water range (its minimum plus the range's
+    # water, never above what the tank holds): at each first moment it runs short, the cheapest quarter hour before it.
+    floor = [s.min_kwh + (min(x.ready_kwh, max(0.0, s.capacity * 0.95 - s.min_kwh)) if s.min_kwh > 0 else 0.0) for x in slots]
     short_at = None
+    given_up: set[int] = set()
     for _ in range(4 * n):
         reserve, energy = _simulate(slots, start_kwh, s, chosen)
-        low = next((i for i, r in enumerate(reserve) if r < s.min_kwh - 1e-6), None)
+        low = next((i for i, r in enumerate(reserve) if r < floor[i] - 1e-6 and i not in given_up), None)
         if low is None:
             break
         best, best_value = None, math.inf
         # Going back from the shortage: heating in slot j raises the reserve at the shortage by what fits in the tank
         # then, less what a later heating already planned can no longer add (its thermostat cuts when full).
         room = math.inf     # the least room left after a heating already planned, between j and the shortage
+        # A range not quite ready while the minimum holds is comfort, not hot water first: never paid at peak price,
+        # only at the cheapest price of the contract or in the sun.
+        comfort = reserve[low] >= s.min_kwh - 1e-6
         for j in range(low, -1, -1):
             if j < low and chosen[j + 1]:
                 room = min(room, s.capacity - reserve[j + 1])
-            if chosen[j]:
+            if chosen[j] or (comfort and unit[j] > cheapest_grid + 1e-6):
                 continue
             before = reserve[j - 1] if j > 0 else start_kwh
             heat = min(full, max(0.0, s.capacity - before))
@@ -417,15 +448,18 @@ def make_plan(slots: list[Slot], start_kwh: float, s: Settings, keep_on: bool = 
                 continue
             # € for each kWh that reaches the shortage (what the tank cannot keep is paid for nothing).
             value = (unit[j] if allowed[j] else unit[j] + 1.0) * heat / gain
-            # Equal prices: next to a heating already planned (one run, not three); then, at night, the latest (the
-            # water waits less in the tank), by day the earliest (hot water sooner rather than at the last minute).
+            # Next to a heating already planned, even a centime dearer (one run, not two: Frank, 26 Nov. 2026); then, at
+            # night, the latest (the water waits less in the tank), by day the earliest (hot water sooner).
             beside = (j > 0 and chosen[j - 1]) or (j + 1 < n and chosen[j + 1])
-            value += (0.0 if beside else 1e-4) + (-j if slots[j].offpeak else j) * 1e-7
+            value += (0.0 if beside else BESIDE_EUR) + (-j if slots[j].offpeak else j) * 1e-7
             if value < best_value - 1e-9:
                 best, best_value = j, value
         if best is None:
-            short_at = slots[low].start
-            break
+            # Nothing left to heat before it: a real shortage under the minimum is said; a range not quite ready is not.
+            given_up.add(low)
+            if short_at is None and reserve[low] < s.min_kwh - 1e-6:
+                short_at = slots[low].start
+            continue
         chosen[best] = True
 
     # Hygiene: once a week, a heating up to the tank's cut, on the cheapest quarter hours.
@@ -597,6 +631,7 @@ def build_slots(now: datetime, tz: tzinfo, price_at, offpeak_at, sun_at, learned
             spare = max(0.0, live_spare_kw)
         need = need_at(local.date()) or 0.0
         drawn = sum(draw_kw(local + timedelta(minutes=m), need, times) for m in (0, 5, 10)) / 3 * SLOT_H
-        out.append(Slot(at, price_at(middle), spare, base, drawn, bool(offpeak_at(middle)), forecast))
+        out.append(Slot(at, price_at(middle), spare, base, drawn, bool(offpeak_at(middle)), forecast,
+                        ready_before(local + SLOT, need, times)))
         at += SLOT
     return out

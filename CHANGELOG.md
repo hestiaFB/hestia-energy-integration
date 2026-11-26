@@ -1,3 +1,18 @@
+## 1.0.1b5 — Le chauffe-eau prêt avant chaque plage, votre vrai ballon en Simulation
+
+### Nouveautés
+
+- Chauffe-eau : mode **Apprentissage**. Le chauffe-eau chauffe en heures creuses, comme avant, sans le plan, le temps que Hestia l’apprenne : une semaine pour l’eau du jour, et un plein vu quand son thermostat coupe. La page montre où il en est et propose de passer en Automatique quand c’est prêt. Le blueprint le pilote comme en Heures creuses.
+- Chauffe-eau : **marche forcée**. Un bouton « Chauffer maintenant » dans la page Chauffe-eau et sur la carte : le chauffe-eau chauffe jusqu’au plein (4 heures au plus), puis le plan reprend. « Arrêter » l’interrompt. Pratique pour une eau chaude tout de suite, ou pour que Hestia voie le ballon plein. En Simulation, rien n’est commandé.
+
+### Corrections
+
+- Chauffe-eau : le ballon est prêt **avant** chaque plage d’eau chaude, comme promis. Avant, le plan ne gardait que le minimum (30 %) : il pouvait arriver au plus bas à 6 h 30 et chauffer pendant la douche. Maintenant, au début de chaque plage, il y a le minimum plus l’eau de la plage. Si le minimum tient déjà, ce complément ne se paie jamais en heures pleines : seulement en heures creuses ou au soleil.
+- La nuit, une seule chauffe au lieu de deux : deux chauffes proches sont réunies, même pour quelques centimes de plus. Avant, un peu de soleil prévu à 8 h suffisait à repousser une partie de la chauffe dans la plage du matin.
+- Le soir, quand il faut de l’eau pour 19 h, le soleil de midi est choisi s’il coûte moins cher que les heures creuses.
+- En Simulation, la réserve montrée est celle de **votre ballon**, suivie d’après ce que le chauffe-eau consomme vraiment : plein quand il s’arrête tout seul en heures creuses, vidé par l’eau du jour. Avant, c’était le ballon que Hestia aurait eu en le pilotant : il ne voyait pas un soir sans eau chaude. Celui du plan reste affiché à côté.
+- L’eau du jour est apprise sur une journée **chargée** (celle que 8 jours sur 10 ne dépassent pas), plus sur une journée moyenne : un soir avec plus de douches ne vide plus le ballon sans que Hestia l’ait prévu.
+
 ## 1.0.1b4 — Les plages d’eau chaude se règlent sans se mélanger
 
 ### Corrections

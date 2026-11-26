@@ -111,6 +111,7 @@
         "name": "Water heater: mode",
         "state": {
           "simulation": "Simulation",
+          "apprentissage": "Learning",
           "automatique": "Automatic",
           "heures_creuses": "Off-peak hours only",
           "vacances": "Away"

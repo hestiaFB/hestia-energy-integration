@@ -243,3 +243,57 @@ class Learning(unittest.TestCase):
 
 if __name__ == "__main__":
     unittest.main()
+
+
+class ReadyForEachRange(unittest.TestCase):
+    """Frank on 26 Nov. 2026, at 15 h 26: a 300 L tank at 45 %, ranges 6 h 30 – 8 h 30 and 19 h – 23 h, off-peak hours
+    from midnight to 8 h 30, a little sun tomorrow. The 1.0.1b4 plan heated twice at night, the second time during the
+    morning range, and left the sun aside. Invented figures, close to his screenshot."""
+
+    RANGES = [(6 * 60 + 30, 120), (19 * 60, 240)]
+
+    @staticmethod
+    def offpeak(moment: datetime) -> bool:
+        local = moment.astimezone(PARIS)
+        return local.hour * 60 + local.minute < 8 * 60 + 30
+
+    @staticmethod
+    def sun(moment: datetime) -> float:
+        """A little sun from 7 h: a few watts to spare at 8 h already, which drew the 1.0.1b4 plan into the range."""
+        local = moment.astimezone(PARIS)
+        t = local.hour + local.minute / 60
+        return 0.0 if t < 7 or t > 17.5 else 2.4 * math.sin(math.pi * (t - 7) / 10.5) ** 1.6
+
+    def make(self):
+        price = lambda m: 0.17 if self.offpeak(m) else 0.25  # noqa: E731
+        learned = w.Learned(3.0, 6.0, 6.0, 28, tuple([0.15] * 24), ())
+        slots = w.build_slots(at(26, 15, 30), PARIS, price, self.offpeak, self.sun, learned, lambda d: 6.0, self.RANGES)
+        s = w.Settings(capacity=15.7, power_kw=3.0, min_kwh=15.7 * 0.3, export_price=0.0, limit_kw=None)
+        return w.make_plan(slots, 7.6, s), slots, s
+
+    def test_the_night_is_one_heating_done_before_the_morning_range(self):
+        p, slots, _ = self.make()
+        night = [r for r in p.runs() if datetime.fromisoformat(r["debut"]).astimezone(PARIS).day == 27
+                 and datetime.fromisoformat(r["debut"]).astimezone(PARIS).hour < 9]
+        self.assertEqual(len(night), 1, p.runs())
+        self.assertLessEqual(datetime.fromisoformat(night[0]["fin"]).astimezone(PARIS), at(27, 6, 30))
+
+    def test_the_tank_is_ready_at_the_start_of_each_range(self):
+        p, slots, s = self.make()
+        for i, slot in enumerate(slots):
+            if slot.ready_kwh:
+                self.assertGreaterEqual(p.reserve[i], s.min_kwh + slot.ready_kwh - 0.01, slot.start)
+
+    def test_the_evening_is_heated_in_the_sun_cheaper_than_the_night(self):
+        p, _, _ = self.make()
+        self.assertGreater(sum(e for e, src in zip(p.energy, p.source) if src in ("soleil", "soleil_partiel")), 0.5, p.runs())
+        self.assertEqual(hours_of(p, "heures_pleines"), 0)
+        self.assertIsNone(p.short_at)
+
+
+class ABusyDay(unittest.TestCase):
+    """The need learned is a busy day, not the median one: a median day left the tank empty one evening in two."""
+
+    def test_eight_days_in_ten_draw_no_more(self):
+        self.assertEqual(w.busy_day([3, 4, 4, 5, 5, 5, 6, 6, 7, 9]), 6)
+        self.assertEqual(w.busy_day([4.0, 5.0, 6.0]), 6.0)

@@ -40,6 +40,11 @@ class WaterHeater:
         self.hass = coordinator.hass
         self.store = Store(self.hass, 1, f"{DOMAIN}.chauffe_eau")
         self.tank = wh.Tank()
+        # In Simulation, the household's own tank, followed from what the heater really takes (its own contactor
+        # drives it): the reserve shown is this one, not the plan's (Frank, 26 Nov. 2026: « hier soir plus d'eau chaude »).
+        self.real = wh.Tank()
+        self._real_on_at: datetime | None = None
+        self._real_idle_since: datetime | None = None
         self.learned: wh.Learned | None = None
         self.forecast: dict[datetime, float] = {}   # the panels' production expected each hour (UTC start), kW
         self.forecast_from: str | None = None       # « prevision » (Energy page), « nuages » (Hestia Weather), None
@@ -87,11 +92,12 @@ class WaterHeater:
     async def async_load(self) -> None:
         kept = await self.store.async_load() or {}
         self.tank = wh.Tank.from_dict(kept.get("reserve"))
+        self.real = wh.Tank.from_dict(kept.get("reserve_reelle"))
         self.ledger = {d: v for d, v in (kept.get("jours") or {}).items() if isinstance(v, dict)}
 
     async def async_save(self) -> None:
         self._dirty = False
-        await self.store.async_save({"reserve": self.tank.as_dict(), "jours": self.ledger})
+        await self.store.async_save({"reserve": self.tank.as_dict(), "reserve_reelle": self.real.as_dict(), "jours": self.ledger})
 
     # --- every hour --------------------------------------------------------------------------------------------
 
@@ -235,11 +241,13 @@ class WaterHeater:
                 self._idle_since = None
         room = capacity - (self.tank.kwh if self.tank.kwh is not None else capacity * 0.9)
         self.tank.follow(now, tz, heated, need_at(local.date()), times, capacity, seen_full)
-        probe = wh.reserve_from_temperature(self._number(s.get("sonde")), setpoint, capacity) if real else None
-        if probe is not None:
+        probe = wh.reserve_from_temperature(self._number(s.get("sonde")), setpoint, capacity)
+        if probe is not None and real:
             self.tank.kwh = probe
             if probe >= capacity - 0.05:
                 self.tank.full_at = now
+        if not real:
+            self._follow_real(now, tz, heater_w, need_at(local.date()), times, capacity, probe)
         self._ledger(now, heater_w, power_kw * 1000 if self.on and room > 0.05 else 0.0, live)
 
         # The sun measured against the forecast: the clouds come (or go) before the forecast says so.
@@ -295,6 +303,51 @@ class WaterHeater:
             self.c._background(self.async_save(), f"{DOMAIN}_chauffe_eau_saved")
         return self._published(now, mode, reason, full, capacity, power_kw, learned, near_breaker)
 
+    def _follow_real(self, now: datetime, tz, heater_w: float | None, need: float, times, capacity: float,
+                     probe: float | None) -> None:
+        """Simulation: the household's own tank, from what the heater really takes. Full when it stops by itself: it was
+        heating, then draws nothing for 5 minutes while its contactor still lets it (off-peak hours, or all day on a
+        base contract), not at the end of the off-peak hours. A temperature probe, when there is one, says it."""
+        if heater_w is None:
+            return      # no measure of the heater: nothing to follow
+        seen_full = False
+        if heater_w >= wh.MIN_ON_KW * 1000:
+            self._real_on_at, self._real_idle_since = now, None
+        elif heater_w < IDLE_W and self._real_on_at and now - self._real_on_at <= timedelta(minutes=10):
+            contract = self.c.contract
+            allowed = (contract is None or contract.option == tariff.BASE
+                       or (self._offpeak(now) and self._offpeak(self._real_on_at) and self._offpeak(now + timedelta(minutes=10))))
+            if allowed:
+                self._real_idle_since = self._real_idle_since or now
+                seen_full = now - self._real_idle_since >= timedelta(minutes=5)
+            else:
+                self._real_idle_since = None
+        self.real.follow(now, tz, heater_w / 1000, need, times, capacity, seen_full)
+        if seen_full:
+            self._real_on_at = self._real_idle_since = None
+        if probe is not None:
+            self.real.kwh = probe
+            if probe >= capacity - 0.05:
+                self.real.full_at = now
+
+    def _learning(self, learned: wh.Learned) -> dict:
+        """Apprentissage: what Hestia knows of the tank already, and whether Automatique can take over (the day's need
+        learned on a week, and the tank seen full at least once)."""
+        days = min(learned.days, wh.MIN_DAYS)
+        full_seen = self.tank.full_at is not None
+        ready = learned.need_week_kwh is not None and full_seen
+        if ready:
+            phrase = "Hestia connaît votre chauffe-eau : vous pouvez passer en Automatique."
+        else:
+            todo = []
+            if learned.need_week_kwh is None:
+                todo.append(f"l'eau du jour ({days} jour{'s' if days > 1 else ''} sur {wh.MIN_DAYS})")
+            if not full_seen:
+                todo.append("le ballon plein (à la fin d'une chauffe, quand son thermostat coupe)")
+            phrase = "Apprentissage : le chauffe-eau chauffe en heures creuses, comme avant. Il reste à voir " + " et ".join(todo) + "."
+        return {"jours": days, "sur": wh.MIN_DAYS, "plein_vu": full_seen, "puissance": learned.power_kw is not None,
+                "pret": ready, "phrase": phrase}
+
     def _decide(self, now: datetime, mode: str, full: bool, near_breaker: bool) -> tuple[str, bool]:
         if near_breaker:
             return "delestage", False
@@ -303,7 +356,7 @@ class WaterHeater:
                 self._boost_until = None
             else:
                 return "boost", True
-        if mode == wh.OFFPEAK:
+        if mode in (wh.OFFPEAK, wh.LEARN):
             offpeak = self._offpeak(now)
             return ("heures_creuses" if offpeak else "attente"), offpeak
         plan = self.plan
@@ -318,8 +371,13 @@ class WaterHeater:
         return ("plein" if full else "attente"), False
 
     def boost(self, now: datetime) -> None:
-        """« Chauffer maintenant »: until the tank is full (at most 4 hours), then the plan again."""
+        """« Chauffer maintenant » (the forced heating): until the tank is full (at most 4 hours), then the plan again."""
         self._boost_until = now + BOOST_MAX
+        self._planned_at = None
+
+    def stop_boost(self) -> None:
+        """The forced heating stopped by hand: the plan again."""
+        self._boost_until = None
         self._planned_at = None
 
     def replan(self) -> None:
@@ -385,6 +443,9 @@ class WaterHeater:
             sentence = "Chauffe demandée : jusqu'au plein, puis le plan reprend."
         elif mode == wh.OFFPEAK:
             sentence = "Heures creuses seules : le chauffe-eau chauffe pendant les heures creuses, sans plan."
+        learning = self._learning(learned) if mode == wh.LEARN else None
+        if learning and reason != "boost":
+            sentence = learning["phrase"]
         curve = []
         if plan:
             for i in range(0, len(plan.slots), 2):        # every half hour: enough for the card's drawing
@@ -410,6 +471,12 @@ class WaterHeater:
             "jusqu_a": current["fin"] if current and self.on else None,
             "prochaine_chauffe": following["debut"] if following else (current["debut"] if current and not self.on else None),
             "reserve": pct, "reserve_kwh": None if self.tank.kwh is None else round(self.tank.kwh, 2),
+            "force_jusqu_a": self._boost_until.isoformat() if self._boost_until else None,
+            "apprentissage": learning,
+            # Simulation: the household's own tank (the plan's is `reserve`); None when Hestia drives the heater.
+            "reserve_reelle": None if mode != wh.SIMULATION or self.real.kwh is None else round(self.real.kwh / capacity * 100),
+            "reserve_reelle_kwh": None if mode != wh.SIMULATION or self.real.kwh is None else round(self.real.kwh, 2),
+            "sonde": bool(self.settings.get("sonde")),
             "capacite_kwh": round(capacity, 2), "puissance_kw": round(power_kw, 2),
             "besoin_kwh": round(learned.need(now.astimezone(tz).date()) or DEFAULT_NEED_KWH, 1),
             "plan": runs[:8], "kwh_prevus": round(plan.kwh, 2) if plan else None, "cout_prevu": round(plan.euros, 2) if plan else None,
