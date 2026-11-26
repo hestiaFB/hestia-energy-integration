@@ -31,7 +31,10 @@ SLOT_H = 0.25
 HORIZON = timedelta(hours=36)
 # The modes of the select « Chauffe-eau : mode ». Simulation first: nothing is commanded until the household says so.
 SIMULATION, AUTO, OFFPEAK, AWAY = "simulation", "automatique", "heures_creuses", "vacances"
-MODES = (SIMULATION, AUTO, OFFPEAK, AWAY)
+# Apprentissage (1.0.1b5, Frank): heats in the off-peak hours as before, without the plan, while Hestia learns the tank
+# (its 100 % seen when its thermostat cuts, its power, its day's need); it says when Automatique can take over.
+LEARN = "apprentissage"
+MODES = (SIMULATION, LEARN, AUTO, OFFPEAK, AWAY)
 # The settings of the water heater, with their defaults (a setting, never a constant, when it depends on the home).
 DEFAULTS = {"mode": SIMULATION, "appareil": None, "prise": None, "sonde": None, "litres": None, "puissance_w": None,
             "heures": ["06:00-09:00", "19:00-23:00"], "reserve_min": 0.3, "demarrages": 4, "consigne": 60}

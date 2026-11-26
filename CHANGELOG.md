@@ -2,6 +2,7 @@
 
 ### Nouveautés
 
+- Chauffe-eau : mode **Apprentissage**. Le chauffe-eau chauffe en heures creuses, comme avant, sans le plan, le temps que Hestia l’apprenne : une semaine pour l’eau du jour, et un plein vu quand son thermostat coupe. La page montre où il en est et propose de passer en Automatique quand c’est prêt. Le blueprint le pilote comme en Heures creuses.
 - Chauffe-eau : **marche forcée**. Un bouton « Chauffer maintenant » dans la page Chauffe-eau et sur la carte : le chauffe-eau chauffe jusqu’au plein (4 heures au plus), puis le plan reprend. « Arrêter » l’interrompt. Pratique pour une eau chaude tout de suite, ou pour que Hestia voie le ballon plein. En Simulation, rien n’est commandé.
 
 ### Corrections

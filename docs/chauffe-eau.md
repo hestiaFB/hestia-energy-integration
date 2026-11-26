@@ -66,13 +66,12 @@ Le mode se choisit dans la page Chauffe-eau, ou par l’entité **Chauffe-eau : 
 | Mode | Ce qu’il fait |
 | --- | --- |
 | **Simulation** (par défaut) | Hestia montre ce qu’elle ferait. Le capteur suit le plan, mais le blueprint ne touche pas à la prise. Hestia continue de conseiller les heures du chauffe-eau. |
+| **Apprentissage** | Chauffe en heures creuses, comme avant, sans plan, le temps que Hestia apprenne le ballon : une semaine pour l’eau du jour, et un plein vu (son thermostat coupe). La page dit où il en est et propose de passer en Automatique. |
 | **Automatique** | Hestia décide des chauffes ; votre automatisation allume et éteint la prise. |
 | **Heures creuses** | Chauffe pendant les heures creuses, sans plan, comme un contacteur jour/nuit. |
 | **Vacances** | Ne chauffe plus, sauf la chauffe complète de la semaine pour l’hygiène. |
 
-Le bouton **Chauffe-eau : chauffer maintenant** demande une chauffe jusqu’au plein (4 heures au plus), puis le plan reprend.
-
-Conseil : restez quelques jours en Simulation, regardez le plan et « Les derniers jours » (ce que le chauffe-eau a coûté, ce que le plan aurait coûté), puis passez en Automatique.
+Conseil : passez une semaine en Apprentissage (ou en Simulation), regardez le plan et « Les derniers jours » (ce que le chauffe-eau a coûté, ce que le plan aurait coûté), puis passez en Automatique.
 
 ## Le blueprint
 

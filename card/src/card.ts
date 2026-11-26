@@ -912,7 +912,7 @@ const HEAT_NOW:Record<string,string>={soleil:'Il chauffe au soleil.',soleil_part
 /** The colour of a heating by its source: the sun, the off-peak night, the peak price. */
 const SOURCE_C:Record<string,string>={soleil:'--nw-sun',soleil_partiel:'--nw-act',heures_creuses:'--nw-cold',heures_pleines:'--nw-peak',base:'--nw-home'};
 const SOURCE_W:Record<string,string>={soleil:'au soleil',soleil_partiel:'en partie au soleil',heures_creuses:'en heures creuses',heures_pleines:'en heures pleines',base:'au prix de base'};
-const MODE_W:Record<string,string>={simulation:'Simulation',automatique:'Automatique',heures_creuses:'Heures creuses seules',vacances:'Vacances'};
+const MODE_W:Record<string,string>={simulation:'Simulation',apprentissage:'Apprentissage',automatique:'Automatique',heures_creuses:'Heures creuses seules',vacances:'Vacances'};
 
 /** « 22 h », « 22 h 30 »: a clock without the useless « 00 ». */
 const hmd=(d:Date)=>d.getMinutes()?clock(d):hour(d.getHours());

@@ -233,6 +233,21 @@ class InventedHome(unittest.IsolatedAsyncioTestCase):
         self.assertNotEqual(c.data["chauffe_eau"]["raison"], "boost")
         self.assertEqual(self.commands, [])
 
+    async def test_learning_heats_off_peak_and_says_what_is_left(self):
+        _, c = await self.setup({"chauffe_eau": {"mode": "apprentissage", "prise": "switch.prise_chauffe_eau"}})
+        found = c.data["chauffe_eau"]
+        self.assertFalse(found["simulation"])
+        learning = found["apprentissage"]
+        self.assertFalse(learning["plein_vu"])
+        self.assertFalse(learning["pret"])
+        self.assertIn("ballon plein", learning["phrase"])
+        self.assertEqual(found["phrase"], learning["phrase"])
+        c.heater.tank.full_at = dt_util.utcnow()
+        c._update_live()
+        self.assertTrue(c.data["chauffe_eau"]["apprentissage"]["pret"])
+        self.assertIn("Automatique", c.data["chauffe_eau"]["phrase"])
+        self.assertEqual(self.commands, [])
+
 
 if __name__ == "__main__":
     unittest.main()

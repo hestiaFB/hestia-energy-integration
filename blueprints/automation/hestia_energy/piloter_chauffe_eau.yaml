@@ -75,7 +75,7 @@ variables:
     {% set h = now().strftime('%H:%M:%S') %}
     {{ (debut_hc <= h or h < fin_hc) if debut_hc > fin_hc else (debut_hc <= h < fin_hc) }}
   voulu: >-
-    {% if mode_actuel in ['automatique', 'heures_creuses', 'vacances'] and states(pilote_entite) in ['on', 'off'] %}{{ states(pilote_entite) }}
+    {% if mode_actuel in ['automatique', 'apprentissage', 'heures_creuses', 'vacances'] and states(pilote_entite) in ['on', 'off'] %}{{ states(pilote_entite) }}
     {%- elif repli and absent %}{{ 'on' if en_hc else 'off' }}
     {%- else %}rien{% endif %}
 

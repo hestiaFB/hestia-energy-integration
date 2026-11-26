@@ -330,6 +330,24 @@ class WaterHeater:
             if probe >= capacity - 0.05:
                 self.real.full_at = now
 
+    def _learning(self, learned: wh.Learned) -> dict:
+        """Apprentissage: what Hestia knows of the tank already, and whether Automatique can take over (the day's need
+        learned on a week, and the tank seen full at least once)."""
+        days = min(learned.days, wh.MIN_DAYS)
+        full_seen = self.tank.full_at is not None
+        ready = learned.need_week_kwh is not None and full_seen
+        if ready:
+            phrase = "Hestia connaît votre chauffe-eau : vous pouvez passer en Automatique."
+        else:
+            todo = []
+            if learned.need_week_kwh is None:
+                todo.append(f"l'eau du jour ({days} jour{'s' if days > 1 else ''} sur {wh.MIN_DAYS})")
+            if not full_seen:
+                todo.append("le ballon plein (à la fin d'une chauffe, quand son thermostat coupe)")
+            phrase = "Apprentissage : le chauffe-eau chauffe en heures creuses, comme avant. Il reste à voir " + " et ".join(todo) + "."
+        return {"jours": days, "sur": wh.MIN_DAYS, "plein_vu": full_seen, "puissance": learned.power_kw is not None,
+                "pret": ready, "phrase": phrase}
+
     def _decide(self, now: datetime, mode: str, full: bool, near_breaker: bool) -> tuple[str, bool]:
         if near_breaker:
             return "delestage", False
@@ -338,7 +356,7 @@ class WaterHeater:
                 self._boost_until = None
             else:
                 return "boost", True
-        if mode == wh.OFFPEAK:
+        if mode in (wh.OFFPEAK, wh.LEARN):
             offpeak = self._offpeak(now)
             return ("heures_creuses" if offpeak else "attente"), offpeak
         plan = self.plan
@@ -425,6 +443,9 @@ class WaterHeater:
             sentence = "Chauffe demandée : jusqu'au plein, puis le plan reprend."
         elif mode == wh.OFFPEAK:
             sentence = "Heures creuses seules : le chauffe-eau chauffe pendant les heures creuses, sans plan."
+        learning = self._learning(learned) if mode == wh.LEARN else None
+        if learning and reason != "boost":
+            sentence = learning["phrase"]
         curve = []
         if plan:
             for i in range(0, len(plan.slots), 2):        # every half hour: enough for the card's drawing
@@ -451,6 +472,7 @@ class WaterHeater:
             "prochaine_chauffe": following["debut"] if following else (current["debut"] if current and not self.on else None),
             "reserve": pct, "reserve_kwh": None if self.tank.kwh is None else round(self.tank.kwh, 2),
             "force_jusqu_a": self._boost_until.isoformat() if self._boost_until else None,
+            "apprentissage": learning,
             # Simulation: the household's own tank (the plan's is `reserve`); None when Hestia drives the heater.
             "reserve_reelle": None if mode != wh.SIMULATION or self.real.kwh is None else round(self.real.kwh / capacity * 100),
             "reserve_reelle_kwh": None if mode != wh.SIMULATION or self.real.kwh is None else round(self.real.kwh, 2),

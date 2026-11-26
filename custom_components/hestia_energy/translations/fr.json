@@ -111,6 +111,7 @@
         "name": "Chauffe-eau : mode",
         "state": {
           "simulation": "Simulation",
+          "apprentissage": "Apprentissage",
           "automatique": "Automatique",
           "heures_creuses": "Heures creuses seules",
           "vacances": "Vacances"

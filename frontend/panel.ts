@@ -29,7 +29,7 @@ type Hub={pret:boolean;soleil:boolean;direct:boolean;vide:boolean;a_regler:Todo[
 /** The water heater driven by Hestia (1.0.1b1, chauffe_eau.py): what the card shows, and its settings. */
 type HeaterRun={debut:string;fin:string;source:string;kwh:number;euros:number};
 type Heater={mode:string;simulation:boolean;chauffer:boolean;raison:string;phrase:string;jusqu_a:string|null;prochaine_chauffe:string|null;
- reserve:number|null;reserve_reelle?:number|null;sonde?:boolean;force_jusqu_a?:string|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
+ reserve:number|null;reserve_reelle?:number|null;sonde?:boolean;force_jusqu_a?:string|null;apprentissage?:{jours:number;sur:number;plein_vu:boolean;puissance:boolean;pret:boolean;phrase:string}|null;capacite_kwh:number;puissance_kw:number;besoin_kwh:number;plan:HeaterRun[];kwh_prevus:number|null;cout_prevu:number|null;
  soleil_prevu:string|null;plein_le:string|null;bilan:{jour:string;reel_kwh:number;reel_eur:number;hestia_kwh:number;hestia_eur:number;hc_eur:number;prix_inconnu:boolean}[];
  appris:{days?:number}|null;manque:string[];prise:string|null;prise_etat:string|null;suit:boolean|null};
 type HeaterSettings={mode?:string;appareil?:string|null;prise?:string|null;sonde?:string|null;litres?:number|null;puissance_w?:number|null;heures?:string[];reserve_min?:number;demarrages?:number;consigne?:number};
@@ -42,6 +42,7 @@ const REPO='https://github.com/hestiaFB/hestia-energy-integration';
 const VERSION='1.0.1b5';
 const BLUEPRINT='https://my.home-assistant.io/redirect/blueprint_import/?blueprint_url='+encodeURIComponent(REPO+'/blob/main/blueprints/automation/hestia_energy/piloter_chauffe_eau.yaml');
 const HEATER_MODES:[string,string,string][]=[['simulation','Simulation','Hestia montre ce qu’il ferait. Votre automatisation ne touche pas au chauffe-eau.'],
+ ['apprentissage','Apprentissage','Chauffe en heures creuses, comme avant, le temps que Hestia apprenne le ballon (une semaine, et un plein vu). Il dit quand passer en Automatique.'],
  ['automatique','Automatique','Hestia décide des chauffes ; votre automatisation allume et éteint la prise.'],
  ['heures_creuses','Heures creuses','Chauffe pendant les heures creuses, sans plan, comme un contacteur jour/nuit.'],
  ['vacances','Vacances','Ne chauffe plus, sauf une chauffe complète de la semaine pour l’hygiène.']];
@@ -403,6 +404,10 @@ export class HestiaEnergySetup extends LitElement {
      {value:w.chauffer?(w.jusqu_a?'jusqu’à '+hm(new Date(w.jusqu_a)):'en cours'):w.prochaine_chauffe?when(w.prochaine_chauffe):'—',label:w.chauffer?'chauffe':'prochaine chauffe'},
      {value:w.cout_prevu!=null?eur(w.cout_prevu):'—',label:w.kwh_prevus!=null?`prévus pour ${kwh(w.kwh_prevus)}`:'prévus'}]):nothing}
    ${todo.length?listSection('À régler',todo):nothing}
+   ${w?.apprentissage?listSection('Apprentissage',[
+     listRow({label:'L’eau du jour',value:html`<b>${w.apprentissage.jours} / ${w.apprentissage.sur} jours</b>`}),
+     listRow({label:'Le ballon plein',sub:w.apprentissage.plein_vu?'Vu : son thermostat a coupé.':'Pas encore vu. « Chauffer maintenant » ci-dessous le montre en une chauffe.',value:html`<b>${w.apprentissage.plein_vu?'vu':'à voir'}</b>`}),
+     ...(w.apprentissage.pret?[listRow({label:html`<b>Prêt : passer en Automatique</b>`,go:()=>this.setHeater('mode','automatique')})]:[])]):nothing}
    ${w?listSection('Marche forcée',[listRow({label:w.force_jusqu_a?html`<b>Chauffe jusqu’au plein</b>`:'Chauffer maintenant, jusqu’au plein',
      sub:w.force_jusqu_a?`Au plus jusqu’à ${hm(new Date(w.force_jusqu_a))}, puis le plan reprend.${sim?' En Simulation, rien n’est commandé.':''}`
       :`Pour une eau chaude tout de suite, ou pour que Hestia voie le ballon plein. Au plus 4 heures, puis le plan reprend.${sim?' En Simulation, rien n’est commandé.':''}`,
