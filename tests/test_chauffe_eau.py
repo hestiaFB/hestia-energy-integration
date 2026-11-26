@@ -314,3 +314,22 @@ class KeptOnIsNotHotWaterFirst(unittest.TestCase):
         p, _, _ = plan(at(26, 17), start=0.5)
         self.assertTrue(p.on[0])
         self.assertTrue(p.urgent)
+
+
+class TheSunWhenItIsCheaper(unittest.TestCase):
+    """Frank, 26 Nov. 2026: « le plus économe pour le client ». Resale at 0,1276 €, off-peak at 0,1589 €: the sun to
+    spare is kept in the tank (it spares a night heating), never when it would cost more than that heating."""
+
+    @staticmethod
+    def sun_kept(resale: float) -> float:
+        price = lambda m: 0.1589 if offpeak(m) else 0.2142      # noqa: E731
+        s = w.Settings(capacity=10, power_kw=2.4, min_kwh=0.0, export_price=resale, limit_kw=5.4, hygiene_due=False)
+        p, _, _ = plan(at(27, 9), bell(3.4), start=6.0, price=price, settings=s)
+        return sum(e for e, src in zip(p.energy, p.source) if src == "soleil")
+
+    def test_a_resale_under_the_off_peak_price_fills_the_tank_in_the_sun(self):
+        # At 0,15 € the sun only heats what the tank needs (still cheaper than the night); at 0,1276 € it fills it.
+        self.assertGreater(self.sun_kept(0.1276), self.sun_kept(0.15) + 1.0)
+
+    def test_a_resale_dearer_than_the_night_is_sold(self):
+        self.assertEqual(self.sun_kept(0.17), 0.0)

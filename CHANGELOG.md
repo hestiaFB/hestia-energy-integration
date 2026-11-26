@@ -1,4 +1,8 @@
-## 1.0.1b6 — La marche forcée comptée à part
+## 1.0.1b6 — Le soleil gardé quand il coûte moins que la nuit, la marche forcée comptée à part
+
+### Améliorations
+
+- Chauffe-eau : le soleil en trop remplit le ballon dès qu’il coûte moins cher que la chauffe de nuit qu’il évite, même quand le ballon n’en a pas besoin tout de suite. Le soleil gardé coûte ce que vous auriez touché en le revendant ; il est pris tant qu’il reste sous le prix des heures creuses, moins 10 % pour les pertes du ballon. Avant, il fallait qu’il coûte moins du tiers des heures creuses : avec une revente à 0,13 € et des heures creuses à 0,16 €, Hestia revendait le soleil et rachetait la nuit. Quand la revente rapporte plus, Hestia revend toujours.
 
 ### Corrections
 

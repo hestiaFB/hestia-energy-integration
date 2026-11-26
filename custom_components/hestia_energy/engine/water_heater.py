@@ -14,7 +14,8 @@ How it decides (docs/chauffe-eau.md, the proposal validated by Frank on 26 Nov. 
 4. The plan: the cheapest quarter hours that keep the reserve above its minimum at every moment, and that have it ready
    at the start of each hot-water range (its minimum plus the water of that range: no heating left for the range
    itself), in runs of at least 30 minutes, with few starts a day; heatings side by side rather than apart, for a few
-   centimes (1.0.1b5). The sun nearly free is taken while the tank is not full.
+   centimes (1.0.1b5). The sun is taken while the tank is not full, as long as it costs less than the heating it
+   spares (the cheapest grid price, less a margin for the tank's losses: 1.0.1b6).
 5. Hot water first: when nothing cheaper is left before the reserve runs short, the heater heats now, whatever the price.
 
 Plain Python: no Home Assistant here. The coordinator gives the slots (prices, sun, house), the reserve and the settings.
@@ -44,6 +45,7 @@ LOSS_SHARE = 0.25                  # of the day's need, the tank's losses, sprea
 DRAW_HOURS = 1.0                   # a hot-water time given alone (« 07:00 ») draws over this long
 HYGIENE_DAYS = 7                   # a full heating at least once a week (the tank's thermostat cut reached)
 LEARN_DAYS = 28
+SUN_LOSSES = 0.1                   # the sun kept when the tank does not need it: under the cheapest grid price less 10 %
 BUSY = 0.8                         # the need learned is a busy day: 8 days in 10 draw no more (1.0.1b5; the median before)
 MIN_DAYS = 7
 MIN_ON_KW = 0.3                    # the heater heats above this
@@ -409,10 +411,13 @@ def make_plan(slots: list[Slot], start_kwh: float, s: Settings, keep_on: bool = 
     if n == 0 or full <= 0:
         return Plan(slots, chosen, [], [], [], [])
 
-    # The sun nearly free, while the tank is not full (« il en profite »): at most a third of the grid's cheapest price.
+    # The sun to spare, while the tank is not full (« il en profite »): whatever is cheaper for the household, Frank
+    # (26 Nov. 2026). A kWh heated in the sun costs the resale lost, and spares a kWh bought later at the grid's
+    # cheapest price; it is taken as long as it stays under that price, less a margin for the tank's losses (water
+    # heated sooner waits longer). A third of that price before 1.0.1b6: a resale at 0,13 € was never kept.
     cheapest_grid = min((_grid_price(x, fallback) for x in slots), default=fallback)
     for i in sorted(range(n), key=lambda k: unit[k]):
-        if unit[i] > cheapest_grid / 3 or slots[i].sun_kw < MIN_ON_KW or not allowed[i]:
+        if unit[i] > cheapest_grid * (1 - SUN_LOSSES) or slots[i].sun_kw < MIN_ON_KW or not allowed[i]:
             continue
         chosen[i] = True
     reserve, energy = _simulate(slots, start_kwh, s, chosen)
