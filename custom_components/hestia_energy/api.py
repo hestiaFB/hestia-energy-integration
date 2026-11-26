@@ -157,6 +157,18 @@ class HestiaEnergyApi:
         """The heating of one room (Confort's Bilan): with the link to Hestia Comfort, after the first preview."""
         return None
 
+    def water_heater(self) -> dict | None:
+        """The water heater driven by Hestia (1.0.0b11): whether it heats now and why, its reserve (%), the next heating,
+        the plan ({debut, fin, source, kwh, euros}), the mode (« simulation »: nothing is commanded). None without one."""
+        if not self.coordinator:
+            return None
+        found = self.coordinator.data.get("chauffe_eau")
+        if not found:
+            return None
+        return {"heating": found.get("chauffer"), "reason": found.get("raison"), "reserve": found.get("reserve"),
+                "next": found.get("prochaine_chauffe"), "until": found.get("jusqu_a"), "plan": list(found.get("plan") or []),
+                "mode": found.get("mode"), "simulation": found.get("simulation")}
+
     def limits(self) -> dict | None:
         if not self.coordinator:
             return None

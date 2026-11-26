@@ -16,6 +16,7 @@ from homeassistant.components.recorder import get_instance, statistics
 from homeassistant.core import HomeAssistant
 from homeassistant.helpers import area_registry as ar, device_registry as dr, entity_registry as er
 from homeassistant.loader import async_get_integration, async_get_loaded_integration
+from homeassistant.util import dt as dt_util
 
 from .engine.rows import Rows
 
@@ -387,4 +388,53 @@ async def reference_statistics(hass: HomeAssistant) -> dict:
             out.setdefault("revente", sid)
         elif "myelectricaldata" in head or "myelectricaldata" in source:
             out.setdefault("revente" if "production" in sid.lower() else "achats", sid)
+    return out
+
+
+async def solar_forecast(hass: HomeAssistant, entries: list[str]) -> dict[datetime, float]:
+    """The panels' production forecast of the Energy page (Forecast.Solar, Solcast…), summed over its forecasts: each
+    hour's start (UTC) and its mean power in kW. Empty when there is none or it does not answer: never an error."""
+    try:
+        from homeassistant.components.energy.websocket_api import async_get_energy_platforms
+        platforms = await async_get_energy_platforms(hass)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Energy forecast platforms unavailable: %s", err)
+        return {}
+    out: dict[datetime, float] = {}
+    for entry_id in entries:
+        entry = hass.config_entries.async_get_entry(entry_id)
+        if entry is None or entry.domain not in platforms:
+            continue
+        try:
+            found = await platforms[entry.domain](hass, entry_id)
+        except Exception as err:  # noqa: BLE001 - another integration's trouble never stops this one
+            _LOGGER.debug("Solar forecast of %s unavailable: %s", entry.domain, err)
+            continue
+        for stamp, wh in ((found or {}).get("wh_hours") or {}).items():
+            at = dt_util.parse_datetime(str(stamp))
+            if at is None or not isinstance(wh, (int, float)):
+                continue
+            at = dt_util.as_utc(at).replace(minute=0, second=0, microsecond=0)
+            out[at] = out.get(at, 0.0) + wh / 1000
+    return out
+
+
+def weather_hours(hass: HomeAssistant, place: str | None) -> list[dict]:
+    """Hestia Weather's hourly forecast for this place, by its interface version 1 (`hourly()`): each hour's time
+    (aware), its cloud cover (%) and sky. Empty without Weather or without a place."""
+    api = weather_api(hass)
+    if api is None or not place or not hasattr(api, "hourly"):
+        return []
+    try:
+        hours = api.hourly(place)
+    except Exception as err:  # noqa: BLE001
+        _LOGGER.debug("Hestia Weather's hourly forecast unavailable: %s", err)
+        return []
+    out = []
+    for hour in hours or []:
+        at = dt_util.parse_datetime(str(hour.get("time") or ""))
+        if at is None:
+            continue
+        out.append({"time": at if at.tzinfo else at.replace(tzinfo=dt_util.UTC), "cloud_coverage": hour.get("cloud_coverage"),
+                    "condition": hour.get("condition")})
     return out
