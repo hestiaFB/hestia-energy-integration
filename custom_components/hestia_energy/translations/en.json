@@ -167,6 +167,14 @@
         "export_price": {
           "name": "Resale price",
           "description": "In euros per kWh."
+        },
+        "battery_soc": {
+          "name": "Battery charge",
+          "description": "The home battery's sensor in %, when Hestia did not find the right one."
+        },
+        "battery_kwh": {
+          "name": "Battery capacity",
+          "description": "In usable kWh, when the one Hestia learned is not right."
         }
       }
     }

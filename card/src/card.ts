@@ -20,7 +20,9 @@ type Banner={id:string;couleur:string;pastille:string;titre:string;pourquoi:stri
 type Period={euros:number|null;euros_energie:number|null;kwh_achetes:number;soleil_kwh:number|null;revendu_kwh:number|null;revendu_euros:number|null;soleil_couvre:number|null;soleil_garde:number|null;heures_inconnues:number;debut:string};
 type Hour={h:number;achat:number|null;soleil:number|null;revente:number|null};
 type Running={nom:string;type:string;w:number};
-type Direct={achat_w:number|null;revente_w:number|null;soleil_w:number|null;maison_w:number|null;periode:string|null;prix:number|null;couleur?:string|null;couleur_demain?:string|null;
+/** The home battery now (1.0.1b3): what it gives or takes (W), its charge, and at this pace until when it lasts or when it is full. */
+type Battery={decharge_w:number|null;charge_w:number|null;pourcent:number|null;capacite_kwh:number|null;reste_kwh:number|null;jusqu_a:string|null;pleine_a:string|null};
+type Direct={achat_w:number|null;revente_w:number|null;soleil_w:number|null;maison_w:number|null;batterie?:Battery|null;periode:string|null;prix:number|null;couleur?:string|null;couleur_demain?:string|null;
  prochain_changement:{a:string;periode:string}|null;en_marche:Running[];bandeau:Banner;fuite:{minutes:number|null;debit:number};
  chauffage?:{pieces:{nom:string;w:number|null}[];w:number|null;euros_de_l_heure:number|null;sans_puissance:string[];poele:boolean}|null};
 type Heat={kwh:number;eur:number|null;jours:number};
@@ -84,6 +86,7 @@ const I:Record<string,string>={
  sun:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="4.2"/><path d="M12 2.5v2.2M12 19.3v2.2M2.5 12h2.2M19.3 12h2.2M5.3 5.3l1.6 1.6M17.1 17.1l1.6 1.6M5.3 18.7l1.6-1.6M17.1 6.9l1.6-1.6"/></svg>',
  home:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M3.5 11 12 4l8.5 7"/><path d="M5.5 9.5V20h13V9.5"/><path d="M10 20v-5.5h4V20"/></svg>',
  grid:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><path d="M8 21 11 3h2l3 18"/><path d="M5 7h14M6.5 12h11M9.5 16.5l5-4.5M14.5 16.5l-5-4.5"/></svg>',
+ battery:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round" stroke-linecap="round"><rect x="7" y="4.5" width="10" height="16.5" rx="2.2"/><path d="M10 2.5h4M10 15h4M10 11h4"/></svg>',
  bolt:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M13 2.5 5 13.5h6l-1 8 8-11h-6z"/></svg>',
  drop:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linejoin="round"><path d="M12 3s6.5 7 6.5 11.2A6.5 6.5 0 0 1 5.5 14.2C5.5 10 12 3 12 3z"/></svg>',
  clock:'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><circle cx="12" cy="12" r="8.5"/><path d="M12 7.5V12l3 2"/></svg>',
@@ -228,16 +231,52 @@ class HestiaEnergyCard extends LitElement {
  /** « en heures pleines » / « en heures creuses » / nothing on Base. */
  private _when(d?:Direct){return d?.periode==='hc'?'en heures creuses':d?.periode==='hp'?'en heures pleines':'';}
 
- /* What the home draws now, in one sentence (the tile, « En ce moment »). */
+ /* What the home draws now, in one sentence (the tile, « En ce moment »). With a battery (HACF, 26 Nov. 2026): what it
+    covers or takes, and how long it lasts at this pace; never « le reste vient du réseau : 0,00 € » when nothing comes. */
  private _nowSay(v:View,withHome:boolean){
   const d=v.direct!,home=d.maison_w??0,sun=Math.min(d.soleil_w??0,home),bought=d.achat_w??0,sold=d.revente_w??0;
+  const bat=d.batterie,gives=Math.min(bat?.decharge_w??0,Math.max(0,home-sun)),takes=bat?.charge_w??0;
   const when=this._when(d),cost=d.prix!=null?html`<b>${eur(bought/1000*d.prix)} € de l'heure</b>${when?`, ${when}`:''}`:null;
   const lead=withHome?html`La maison consomme <b>${kw(home)} kW</b>. `:nothing;
-  if(v.equipement.soleil&&sold>=30&&bought<30)return html`${lead}Le soleil couvre tout, et <b>${kw(sold)} kW</b> partent au réseau.`;
-  if(v.equipement.soleil&&sun>=30){
-   if(withHome)return html`${lead}Le soleil en couvre <b>${Math.round(sun/home*100)} %</b>, le reste vient du réseau${cost?html` : ${cost}`:''}.`;
-   return html`Le soleil en donne <b>${kw(sun)} kW</b> ; le reste vient du réseau${cost?html` : ${cost}`:''}.`;}
-  return cost?html`${lead}Tout vient du réseau : ${cost}.`:lead;
+  const solar=!!v.equipement.soleil&&sun>=30,grid=bought>=30,pc=(x:number)=>home>0?Math.round(x/home*100):0;
+  const rest=html`le reste vient du réseau${cost?html` : ${cost}`:''}`;
+  // « Elle » once the sentence has named the battery, else « La batterie ».
+  const named=gives>=30||takes>=30,lasts=this._batteryLasts(d,named);
+  // What leaves for the grid: paid, or only injected (HACF, 26 Nov.: « injection réseau » with a resale price of 0 €).
+  const out=this._paid(v)?'partent au réseau':'sont injectés dans le réseau';
+  if(solar&&sold>=30&&!grid)return html`${lead}Le soleil couvre tout${takes>=30?html`, charge la batterie (<b>${kw(takes)} kW</b>)`:''} et <b>${kw(sold)} kW</b> ${out}.${lasts}`;
+  if(gives>=30){
+   if(!grid)return html`${lead}${solar?html`Le soleil en couvre <b>${pc(sun)} %</b>, la batterie le reste : <b>${kw(gives)} kW</b>.`:html`La batterie couvre toute la maison : <b>${kw(gives)} kW</b>.`}${lasts}`;
+   return html`${lead}${solar?html`Le soleil en couvre <b>${pc(sun)} %</b>, la batterie <b>${pc(gives)} %</b>`:html`La batterie en couvre <b>${pc(gives)} %</b>`} ; ${rest}.${lasts}`;
+  }
+  if(solar){
+   if(!grid)return html`${lead}Le soleil couvre toute la maison${takes>=30?html` et charge la batterie : <b>${kw(takes)} kW</b>`:''}.${lasts}`;
+   if(withHome)return html`${lead}Le soleil en couvre <b>${pc(sun)} %</b>, ${rest}.${lasts}`;
+   return html`Le soleil en donne <b>${kw(sun)} kW</b> ; ${rest}.${lasts}`;}
+  if(takes>=30&&grid&&cost)return html`${lead}Tout vient du réseau, la charge de la batterie aussi (<b>${kw(takes)} kW</b>) : ${cost}.${lasts}`;
+  return cost?html`${lead}Tout vient du réseau : ${cost}.${lasts}`:html`${lead}${lasts}`;
+ }
+ /** Is what leaves for the grid paid? Only with a resale price above 0 € (HACF, 26 Nov. 2026: « injection réseau »). */
+ private _paid(v:View){return (v.contrat?.revente??0)>0;}
+ /** « Elle est à 78 % : à ce rythme, elle couvre les heures pleines jusqu'à 22 h. » Nothing without a battery's charge. */
+ private _batteryLasts(d:Direct,named:boolean){
+  const b=d.batterie;
+  if(!b||b.pourcent==null)return nothing;
+  const who=named?'Elle':'La batterie';
+  if(b.pourcent>=99&&(b.decharge_w??0)<30)return html` ${who} est pleine.`;
+  const at=html` ${who} est à <b>${b.pourcent} %</b>`;
+  if(b.pleine_a)return html`${at} : pleine vers <b>${clock(new Date(b.pleine_a))}</b> à ce rythme.`;
+  if(!b.jusqu_a||(b.decharge_w??0)<30)return html`${at}.`;
+  const end=new Date(b.jusqu_a),next=d.prochain_changement,change=next?new Date(next.a):null;
+  // Until the off-peak hours: the battery covers the peak hours (on a Tempo red day, the dearest of the year).
+  if(d.periode==='hp'&&change&&next!.periode==='hc'){
+   const red=d.couleur==='rouge'?' du jour rouge':'';
+   if(end>=change)return html`${at} : à ce rythme, elle couvre les heures pleines${red} jusqu'à <b>${clock(change)}</b>.`;
+   return html`${at} : à ce rythme, jusque vers <b>${clock(end)}</b>, avant la fin des heures pleines${red} (${clock(change)}).`;
+  }
+  const hours=(end.getTime()-Date.now())/36e5;
+  if(hours>=20)return html`${at} : à ce rythme, de quoi tenir jusqu'à demain.`;
+  return html`${at} : à ce rythme, environ <b>${hours<1?`${Math.max(5,Math.round(hours*12)*5)} min`:`${num(hours,hours<3?1:0)} h`}</b>, jusque vers ${clock(end)}.`;
  }
 
  /* ── 1 · The tile ── */
@@ -384,6 +423,7 @@ class HestiaEnergyCard extends LitElement {
   const d=v.direct!,cheap=(d.periode??'').includes('hc'),tone=cheap?'--nw-cold':'--nw-level3';
   const sun=v.equipement.soleil?Math.max(0,d.soleil_w??0):null,home=Math.max(0,d.maison_w??0);
   const buying=(d.achat_w??0)>=30,selling=!buying&&(d.revente_w??0)>=30,direct=sun==null?0:Math.min(sun,home);
+  const bat=d.batterie;
   const watt=(w:number)=>w<1000?`${num(w,0)} W`:`${num(w/1000,2)} kW`;
   // A light halo around each circle, stronger with the power it carries (Frank, 20 Nov.: the halo on the circle, not on a box).
   const node=(ic:string,c:string,val:string,l:string,a:number,dim=false,more:unknown=nothing)=>html`<div class="fnode${dim?' dim':''}" style="--c:var(${c});--a:${Math.min(1,Math.max(.25,a)).toFixed(2)}"><span class="fdot">${icon(ic)}</span><span class="fl">${l}</span><span class="fv">${val}</span>${more}</div>`;
@@ -393,7 +433,17 @@ class HestiaEnergyCard extends LitElement {
    return html`<div class="flink${on?'':' off'}${back?' back':''}" style="--c:var(${c});--dur:${dur.toFixed(2)}s"><span class="fsay">${on?html`<b>${say[0]}</b><span>${say[1]}</span>`:''}</span><span class="fline">${on?html`<i></i><i></i><i></i>`:nothing}</span></div>`;
   };
   const gridW=buying?d.achat_w!:selling?d.revente_w!:0;
-  const gridSay:[string,string]=buying?[`↙ ${watt(gridW)}`,'achetés']:[`↗ ${watt(gridW)}`,'revendus'];
+  const gridSay:[string,string]=buying?[`↙ ${watt(gridW)}`,'achetés']:[`↗ ${watt(gridW)}`,this._paid(v)?'revendus':'injectés'];
+  // The battery under the home (HACF, 26 Nov. 2026): its charge in a ring round its circle, what it gives or takes on a
+  // short line up to the home. Still: « au repos ».
+  const giving=(bat?.decharge_w??0)>=30,taking=!giving&&(bat?.charge_w??0)>=30,batW=giving?bat!.decharge_w!:taking?bat!.charge_w!:0;
+  const pct=bat?.pourcent;
+  const battery=bat?html`<div class="fbat${giving||taking?'':' rest'}" style="--c:var(--nw-battery);--dur:${Math.max(1.2,3.2-batW/1500).toFixed(2)}s;--p:${pct??0}">
+    <span class="fvline${giving?' up':''}">${giving||taking?html`<i></i><i></i><i></i>`:nothing}</span>
+    <span class="fbat-n"><span class="fring${pct==null?' none':''}"><span class="fdot">${icon('battery')}</span></span>
+     <span class="fbat-t"><span class="fl">Batterie${pct!=null?html` · <b>${pct} %</b>`:''}</span>
+      <span class="fv">${giving?`↑ ${watt(batW)}`:taking?`↓ ${watt(batW)}`:'au repos'}</span>${giving||taking?html`<small>${giving?'vers la maison':'en charge'}</small>`:nothing}</span></span></div>`:nothing;
+
   // The water of the day: one small line under the home, never a node that makes the tile taller (Frank, 20 Nov.).
   const water=v.eau&&v.eau.jour_l>0?html`<span class="fw">${icon('drop')}${num(v.eau.jour_l,0)} L d'eau aujourd'hui</span>`:nothing;
   return html`<div class="flow2${sun==null?' two':''}">
@@ -401,6 +451,7 @@ class HestiaEnergyCard extends LitElement {
    ${node('home',tone,watt(home),'Maison',home/1500,false,water)}
    ${link(tone,gridW,gridSay,buying)}
    ${node('grid',tone,`${selling?'+':''}${watt(gridW)}`,'Réseau',gridW/1500,!buying&&!selling)}
+   ${battery}
   </div>`;
  }
  private _nowSection(v:View){
@@ -642,14 +693,14 @@ class HestiaEnergyCard extends LitElement {
    :p?.en_retrait?.length?html`<b>${p.en_retrait[0].nom}</b> produit ${p.en_retrait[0].pourcent_de_moins} % de moins que d'habitude : à regarder.`
    :html`Les <b>${groups.length} groupes</b> ont produit comme d'habitude : aucun ne faiblit.`;
   return html`${this._ans({...head,val:kwh(j.soleil_kwh),unit:'kWh',cap:'produits par les panneaux',
-    why:j.soleil_garde!=null?html`La maison en a gardé <b>${j.soleil_garde} %</b>.${sold>=0.05?html` Le reste, ${kwh(sold)} kWh, est parti au réseau${j.revendu_euros!=null?html` pour <b>${eur(j.revendu_euros)} €</b>`:''}.`:''}`:nothing})}
+    why:j.soleil_garde!=null?html`La maison en a gardé <b>${j.soleil_garde} %</b>.${sold>=0.05?html` Le reste, ${kwh(sold)} kWh, est parti au réseau${j.revendu_euros!=null&&this._paid(v)?html` pour <b>${eur(j.revendu_euros)} €</b>`:''}.`:''}`:nothing})}
    <div class="encs">
     ${this._enc('Heure par heure',top?html`Le soleil a donné le plus entre <b>${hour(top.h)} et ${hour(top.h+1)} : ${kwh(top.kwh)} kWh</b>. C'est à ces heures-là qu'une machine tourne au soleil.`:nothing,
      html`${cols(hours,'--nw-sun',{pin:x=>`${kwh(x)} kWh`})}${H_TICKS}`,{wide:true})}
-    ${this._enc('Où est parti le soleil',s?.prix_evite!=null&&v.contrat?.revente!=null?html`Le garder vaut mieux que le vendre : il évite <b>${price(s.prix_evite)} €</b> le kWh, la revente n'en paie que <b>${price(v.contrat.revente)} €</b>.`
+    ${this._enc('Où est parti le soleil',s?.prix_evite!=null&&this._paid(v)?html`Le garder vaut mieux que le vendre : il évite <b>${price(s.prix_evite)} €</b> le kWh, la revente n'en paie que <b>${price(v.contrat.revente)} €</b>.`
      :html`La maison en a gardé <b>${kwh(kept)} kWh</b>.`,
      html`<div><div class="split"><i style="width:${kept/j.soleil_kwh*100}%;--c:var(--nw-benefit)"></i><i style="width:${sold/j.soleil_kwh*100}%;--c:var(--nw-sun)"></i></div>
-      <div class="split-l"><span>gardé <b>${kwh(kept)} kWh</b></span><span>vendu <b>${kwh(sold)} kWh${j.revendu_euros!=null?` · ${eur(j.revendu_euros)} €`:''}</b></span></div></div>`)}
+      <div class="split-l"><span>gardé <b>${kwh(kept)} kWh</b></span><span>${this._paid(v)?'vendu':'injecté'} <b>${kwh(sold)} kWh${j.revendu_euros!=null&&this._paid(v)?` · ${eur(j.revendu_euros)} €`:''}</b></span></div></div>`)}
     ${groups.length?this._enc('Chaque groupe de panneaux',health,hb(top5(groups.map(g=>({n:g.nom,v:g.kwh,txt:`${kwh(g.kwh)} kWh`})),x=>`${kwh(x)} kWh`),'--nw-sun')):nothing}
    </div>`;
  }

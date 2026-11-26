@@ -23,7 +23,7 @@ Une seule carte, **Hestia Énergie**, en plusieurs formats. Chacun répond à un
 De haut en bas :
 
 - **L’horloge de la journée** : un trait par heure, de 0 h en haut à 12 h en bas. Sa couleur dit ce qui a été acheté et quand : rouge en heures pleines, bleu en heures creuses, jaune pour le soleil, gris pour hier aux heures à venir. L’aiguille marque l’heure qu’il est. À côté, le conseil du moment, la couleur Tempo du jour et de demain (avec l’option Tempo), le prix du kWh maintenant, l’heure la plus chargée et ce que les panneaux ont produit. Un appui sur une heure donne ses chiffres.
-- **En ce moment** : trois cercles, la production, la maison, le réseau, reliés par ce qui passe de l’un à l’autre (« 829 W revendus »). Une phrase le redit en mots. Il faut un compteur en direct.
+- **En ce moment** : trois cercles, la production, la maison, le réseau, reliés par ce qui passe de l’un à l’autre (« 829 W revendus », ou « injectés » quand la revente ne rapporte rien). Avec une batterie dans la page Énergie, un quatrième cercle sous la maison : sa charge en anneau, ce qu’elle prend ou donne, et, à ce rythme, jusqu’à quand elle tient ou quand elle sera pleine. Une phrase le redit en mots. Il faut un compteur en direct.
 - **Aujourd’hui** et **Ce mois-ci** : les euros depuis minuit et depuis le 1er, comparés à hier à la même heure et à l’an dernier.
 - **Votre contrat, bien utilisé** (en heures creuses) : sur 12 mois, la part de vos achats tombée la nuit, à partir de quand l’option rapporte, et ce que vous auriez payé en Base.
 - **Pour économiser** : un conseil par ligne, du plus rentable au moins rentable. Chacun dit ce qui se passe d’habitude, ce qui serait mieux, et ce que ça rapporte par an.
