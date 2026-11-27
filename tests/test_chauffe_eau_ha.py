@@ -65,7 +65,7 @@ def invented_year(now: datetime) -> dict[str, list[dict]]:
 
 class InventedHome(unittest.IsolatedAsyncioTestCase):
     async def asyncSetUp(self):
-        self.directory = tempfile.TemporaryDirectory()
+        self.directory = tempfile.TemporaryDirectory(ignore_cleanup_errors=True)
         config = Path(self.directory.name)
         (config / "custom_components").mkdir()
         (config / "custom_components" / DOMAIN).symlink_to(ROOT / "custom_components" / DOMAIN)
