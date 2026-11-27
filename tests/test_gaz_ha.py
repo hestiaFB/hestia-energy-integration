@@ -61,6 +61,14 @@ class GasHome(InventedHome):
         self.assertEqual(api.days(today, today - timedelta(days=1)), [])
         self.assertEqual(api.days(today - timedelta(days=500), today), [])
 
+    async def test_hestia_heating_reads_the_price_of_a_kwh(self):
+        await self.setup()
+        self.assertAlmostEqual(self.hass.data[API_KEY].gas_price(), 1.30 / 11.2, places=4)
+
+    async def test_the_price_of_a_kwh_typed_in_reglages(self):
+        await self.setup({"gas_price": 0.105, "gas_kwh_m3": 11.0})
+        self.assertAlmostEqual(self.hass.data[API_KEY].gas_price(), 0.105, places=4)
+
     async def test_the_panel_finds_the_gas(self):
         from custom_components.hestia_energy import hub_view
         _, c = await self.setup()

@@ -188,6 +188,17 @@ class HestiaEnergyApi:
             out.append(entry)
         return out
 
+    def gas_price(self) -> float | None:
+        """The price of a kWh of gas, taxes included, in euros (1.0.1b7): the household's from Réglages, else the
+        Energy page's (a price per m³ divided by the kWh in a m³). None without gas or without a price: never free."""
+        if not self.coordinator:
+            return None
+        found = (self.coordinator.data or {}).get("gaz") or {}
+        price = found.get("prix")
+        if price is None:
+            return None
+        return round(price / (found.get("kwh_par_m3") or 1.0), 5)
+
     def limits(self) -> dict | None:
         if not self.coordinator:
             return None
