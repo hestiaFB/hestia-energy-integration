@@ -45,6 +45,8 @@ Une carte de détail répond d’abord en une phrase, avec son chiffre en gras, 
 
 Un format que votre maison ne peut pas remplir le dit simplement : sans panneaux, la carte Soleil n’a rien à montrer.
 
+La carte **Gaz** (1.0.1b7) montre le gaz comme la carte Eau montre l’eau : les m³ (ou les kWh, selon le compteur) et les euros du mois, abonnement compris quand il est réglé, la fin du mois prévue, le jour par jour et la facture du mois. Elle ne dit pas à quoi sert le gaz : chauffage, cuisine et eau chaude sont ensemble. La part du chauffage, c’est Hestia Chauffage qui la compte.
+
 ## En YAML
 
 Si vous préférez :
@@ -54,7 +56,7 @@ type: custom:hestia-energy-card
 card: tuile
 ```
 
-`card` vaut `complete`, `tuile`, `conseils`, `soleil`, `chauffage`, `veille`, `eau`, `appareils`, `pointe`, `contrat` ou `chauffe_eau`. `name` (facultatif) change le titre.
+`card` vaut `complete`, `tuile`, `conseils`, `soleil`, `chauffage`, `veille`, `eau`, `gaz`, `appareils`, `pointe`, `contrat` ou `chauffe_eau`. `name` (facultatif) change le titre.
 
 ## Les couleurs
 

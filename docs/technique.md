@@ -8,4 +8,11 @@ cd card && npm ci && npm run validate
 
 Le moteur (`custom_components/hestia_energy/engine/`) n’importe rien de Home Assistant : il se teste seul, par rejeu de vraies statistiques. La table des tarifs se reconstruit avec `scripts/tarifs_cre.py` à chaque changement de prix (1er février, 1er août).
 
+## Pour les autres briques
+
+L’interface `hass.data["hestia_energy_api"]` (version 1) ne fait que s’agrandir : une méthode ajoutée ne change rien pour une brique qui ne la lit pas.
+
+- `days(début, fin)` (1.0.1b7) : chaque jour entier, l’électricité consommée par la maison et, avec un compteur de gaz, le gaz (`gas_kwh`, `gas_quantity` dans `gas_unit`, « kWh » ou « m³ »), et si la journée est complète. 400 jours au plus. Hestia Chauffage s’en sert pour trouver la part du chauffage selon le froid : Énergie compte, Chauffage dit à quoi l’énergie a servi.
+- `water_heater()` (1.0.1b1) : le chauffe-eau piloté (voir [le chauffe-eau](chauffe-eau.md)).
+
 [← Retour au README](../README.md)

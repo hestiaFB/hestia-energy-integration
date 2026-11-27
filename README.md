@@ -15,7 +15,7 @@
 
 Elle donne le résultat à **sa carte**, fournie avec elle, et à vos automatisations.
 
-> **Préversion (bêta) 1.0.1b6.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
+> **Préversion (bêta) 1.0.1b7.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
 
 ![Hestia Énergie — l’électricité de la maison, expliquée en euros : la carte complète avec son horloge de la journée, la frise du lave-linge, entre « En ce moment » et « Ce mois-ci »](docs/images/hestia-energy-banner.png)
 
@@ -134,7 +134,8 @@ Pas encore vérifié sur une vraie maison :
 
 - **Le chauffe-eau piloté** (1.0.1b1) : il démarre en Simulation, pour regarder ses plans avant de lui confier la prise.
 - **Tempo** : les couleurs et leurs prix sont comptés, mais aucune maison en Tempo n’a encore servi d’essai.
-- **Gaz, bois, fioul** : pas encore comptés. Le poêle à granulés l’est, avec Suivi Stock Pellet.
+- **Le gaz** (1.0.1b7) : compté comme l’électricité, quantités, euros et abonnement, d’après les compteurs de la page Énergie. Aucune maison au gaz n’a encore servi d’essai. Sa part du chauffage viendra avec Hestia Chauffage.
+- **Bois, fioul** : pas encore comptés. Le poêle à granulés l’est, avec Suivi Stock Pellet.
 - **Pompe à chaleur** : sa consommation est comptée avec le reste de l’électricité, mais aucune maison équipée n’a encore servi d’essai.
 
 À savoir aussi :

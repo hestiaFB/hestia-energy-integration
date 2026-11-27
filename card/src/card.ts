@@ -47,7 +47,10 @@ type View={pret:boolean;palier:number;equipement:{direct?:boolean;soleil?:boolea
  appareils_jour?:{appareils:{nom:string;kwh:number;euros:number|null}[];mesure_kwh:number;maison_kwh:number;sans_prise_kwh:number|null;prix_moyen:number|null}|null;
  pointe?:{h:number;kw:number;part:number|null}|null;
  chauffage?:{etat:string;mois?:Heat|null;saison?:(Heat&{du:string})|null;euros_par_degre?:number|null;poele?:Stove|null};
- usage?:Usage|null;chauffe_eau?:Heater|null;cout_chauffage?:HeatCost|null};
+ usage?:Usage|null;chauffe_eau?:Heater|null;cout_chauffage?:HeatCost|null;gaz?:Gas|null};
+/** The gas of the Energy page (1.0.1b7, engine/gas.py): what the home burns and what it costs, never what for. */
+type Gas={unite:string;prix:number|null;abonnement:number|null;mois:{q:number;euros:number|null;gaz_euros:number|null;abonnement_euros:number|null;fin_de_mois:number|null};
+ jours:{jour:string;q:number|null}[];plus_gros:{jour:string;q:number;euros:number|null}|null;q_par_jour:number|null};
 /** The heating's cost as Hestia Heating counts it (1.0.1b1, « un seul coût »): shown as it is, in place of Énergie's estimate. */
 type HeatDay={jour:string;electrique_kwh:number|null;electrique_eur:number|null;granules_kg:number|null;granules_eur:number|null;chauffage_eur:number|null;gagne_eur:number|null;prix:string|null};
 type HeatCost={aujourdhui:HeatDay;hier:HeatDay|null;mois:Omit<HeatDay,'jour'|'prix'>&{jours:number;du:string};par:string};
@@ -66,7 +69,7 @@ type Usage={jours:number;part_hc:number;seuil_hc:number|null;part_hc_chauffe_eau
  puissance?:{kva:number;jours:number;pointe_w:number;plus_bas:{kva:number;jours_au_dessus:number;euros_an:number|null}}|null};
 type Config={type:string;card?:string;name?:string};
 
-const RUBRICS=['soleil','chauffage','veille','eau','appareils','pointe','contrat','chauffe_eau'] as const;
+const RUBRICS=['soleil','chauffage','veille','eau','gaz','appareils','pointe','contrat','chauffe_eau'] as const;
 /** Advice « à froid » (maquette des cartes 3): a gesture, why, and the euros at stake a year or a winter. */
 type Piste={id:string;titre:string;pourquoi:string;euros_an:number|null;unite:string|null;rubrique:string|null;
  nom?:string;maintenant?:string;mieux?:string;gain?:number;sous?:string;profil?:[number,number,number][];mieux_heures?:[number,number,string][];zones?:[number,number,string][];departs?:[number,number][];jours?:number;lancer?:number|null};
@@ -518,6 +521,9 @@ class HestiaEnergyCard extends LitElement {
   const e=v.eau,leak=v.direct?.fuite?.minutes;
   if(e)out.push(this._go('eau','drop','--nw-water','Eau · ce mois-ci',e.mois_euros!=null?bill(e.mois_euros):num(e.mois_l,0),e.mois_euros!=null?'€':'litres',
    `${e.mois_euros!=null?`${num(e.mois_l,0)} litres. `:''}${leak?`L'eau coule depuis ${Math.round(leak)} min.`:'Pas de fuite.'}`));
+  const g=v.gaz;
+  if(g)out.push(this._go('gaz','flame','--nw-act','Gaz · ce mois-ci',g.mois.euros!=null?bill(g.mois.euros):num(g.mois.q,g.unite==='m³'?1:0),g.mois.euros!=null?'€':g.unite,
+   `${g.mois.euros!=null?`${num(g.mois.q,g.unite==='m³'?1:0)} ${g.unite}. `:''}${g.mois.fin_de_mois!=null?`Environ ${eur(g.mois.fin_de_mois)} € pour le mois.`:'Chauffage, cuisine et eau chaude ensemble.'}`));
   const a=v.appareils_jour?.appareils?.[0];
   if(a)out.push(this._go('appareils','plug','--nw-home','Appareils · aujourd\'hui',kwh(a.kwh),`kWh · ${a.nom}`,'Celui qui a le plus consommé.'));
   const p=v.pointe;
@@ -675,6 +681,7 @@ class HestiaEnergyCard extends LitElement {
    case 'chauffage':return this._heat(v,over);
    case 'veille':return this._night(v,over);
    case 'eau':return this._water(v,over);
+   case 'gaz':return this._gas(v,over);
    case 'appareils':return this._devices(v,over);
    case 'pointe':return this._peak(v,over);
    case 'chauffe_eau':return this._heater(v,over);
@@ -778,6 +785,25 @@ class HestiaEnergyCard extends LitElement {
   return html`${this._ans({...head,period:`les ${hist.length>1?hist.length:w.nuits} dernières nuits`,val:String(w.w),unit:'W',cap:'quand tout dort',
     why:w.euros_par_an!=null?html`La maison les tire jour et nuit, même sans rien allumer : <b>environ ${year(w.euros_par_an)} € par an</b>.`:'Ce fond tourne jour et nuit, même sans rien allumer.'})}
    <div class="encs">${what}${drift}</div>`;
+ }
+
+ /** The gas like the water (1.0.1b7): the month, its bill, day by day. What it is used for is Hestia Chauffage's. */
+ private _gas(v:View,over:boolean){
+  const g=v.gaz,now=new Date(),head={ic:'flame',c:'--nw-act',subject:'Gaz',over};
+  if(!g)return this._ans({...head,period:'ce mois-ci',msg:'Pas de compteur de gaz',why:'Ajoutez-le dans la page Énergie de Home Assistant : Hestia le lira.'});
+  const m=g.mois,days=g.jours??[],month=MONTHS[now.getMonth()],digits=g.unite==='m³'?1:0,big=g.plus_gros;
+  const ticks=days.map((d,i)=>i===days.length-1?'auj.':days.length<=12||[0,7,14,21,28].includes(i)?String(noon(d.jour).getDate()):'');
+  const heat=v.cout_chauffage?' La part du chauffage est dans la carte Chauffage, comptée par Hestia Chauffage.':' Chauffage, cuisine et eau chaude ensemble.';
+  const hasBill=m.euros!=null&&m.abonnement_euros!=null;
+  const billRows=hasBill?html`<div class="gas-bill">
+    <div><span>Gaz brûlé</span><b>${bill(m.gaz_euros)} €</b></div><div><span>Abonnement, depuis le 1er</span><b>${bill(m.abonnement_euros)} €</b></div>
+    ${m.fin_de_mois!=null?html`<div><span>Fin du mois prévue</span><b>≈ ${eur(m.fin_de_mois)} €</b></div>`:nothing}</div>`:nothing;
+  return html`${this._ans({...head,period:`${month}, du 1er au ${now.getDate()}`,
+    val:num(m.q,digits),unit:g.unite,cap:m.euros!=null?html`soit <b>${bill(m.euros)} €</b>${m.abonnement_euros!=null?' abonnement compris':''}`:nothing,
+    why:html`${m.fin_de_mois!=null?html`À ce rythme, <b>environ ${eur(m.fin_de_mois)} €</b> pour ${month}.`:''}${heat}`})}
+   ${days.length?html`<div class="encs">${this._enc('Jour par jour',big?html`Le plus gros jour : <b>le ${dayMonth(big.jour)}, ${num(big.q,digits)} ${g.unite}</b>${big.euros!=null?`, soit ${eur(big.euros)} €`:''}.`:nothing,
+    html`${cols(days.map(d=>d.q),'--nw-act',{pin:x=>`${num(x,digits)} ${g.unite}`,part:days.length-1})}<div class="ticks days">${ticks.map(t=>html`<span>${t}</span>`)}</div>`,{wide:true})}
+    ${hasBill?this._enc('La facture du mois',nothing,billRows):nothing}</div>`:nothing}`;
  }
 
  private _water(v:View,over:boolean){

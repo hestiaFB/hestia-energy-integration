@@ -242,6 +242,27 @@ def _by_id(statistics) -> dict:
     return {s["statistic_id"]: s for s in statistics if "statistic_id" in s}
 
 
+# --- The unit a gas meter counts in (Yann Le Gall, PR 23) ---------------------------------------------------------
+
+GAS_ENERGY, GAS_VOLUME = "kWh", "m³"
+_ENERGY_UNITS = {"wh", "kwh", "mwh", "gwh", "j", "kj", "mj", "gj", "cal", "kcal", "mcal", "gcal"}
+_VOLUME_UNITS = {"m³", "m3", "l", "ml", "ft³", "ft3", "ccf", "mcf", "gal"}
+
+
+def gas_unit(meta: dict | None) -> str | None:
+    """« kWh » or « m³ »: what a gas meter of the page counts, from its statistics' metadata (their unit class, else
+    their unit). The Energy page takes both, and its price is per unit of the meter. None when it is neither, or not
+    known yet."""
+    meta = meta or {}
+    kind = meta.get("unit_class")
+    unit = str(meta.get("statistics_unit_of_measurement") or meta.get("unit_of_measurement") or "").lower()
+    if kind == "energy" or (kind is None and unit in _ENERGY_UNITS):
+        return GAS_ENERGY
+    if kind == "volume" or (kind is None and unit in _VOLUME_UNITS):
+        return GAS_VOLUME
+    return None
+
+
 # --- The consumption source, the one thing the brick needs (D21) ------------------------------------------------
 
 HA_LINKY, MYELECTRICALDATA, TIC, OTHER = "ha_linky", "myelectricaldata", "tic", "autre"

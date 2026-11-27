@@ -11,7 +11,7 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.util import dt as dt_util
 
 from . import reader
-from .engine import heating, hub, phrases, sources, tariff
+from .engine import gas as engine_gas, heating, hub, phrases, sources, tariff
 
 # The extensions (H8): the other bricks first, then by theme. [key, group, name, what it brings, what happens without it
 # (said without « Sans elle / Sans lui » : the page gives the title, Frank 9 Nov. 2026), link]
@@ -568,7 +568,7 @@ def build(hass, c) -> dict:
         "douze_mois": d.get("douze_mois"), "bilans": d.get("bilans") or [],
         # advice « à froid » (engine/daily.py): shown in « À améliorer » with the euros at stake
         "pistes": d.get("pistes") or [],
-        "chauffage": d.get("chauffage"), "eau": d.get("eau"),
+        "chauffage": d.get("chauffage"), "eau": d.get("eau"), "gaz": d.get("gaz"),
         # The heating's cost as Hestia Heating counts it (1.0.1b1): shown as it is, in place of the estimate.
         "cout_chauffage": d.get("cout_chauffage"),
         "sources": build_sources(hass, c), "appareils": devices,
@@ -644,6 +644,11 @@ def found_settings(hass, c) -> dict:
             break
     water = next((m.price.number for m in page.water if m.price.number is not None), None) if page else None
     pellets = (c.found_extras or {}).get("pellets")
+    # The gas: the page's price is per unit of the meter; shown per kWh (a m³ divided by the bill's coefficient).
+    gas_meters = [m for m in page.gas if not _stove(m, c)] if page else []
+    gas_unit = engine_gas.unit_of([m.stat for m in gas_meters], c.gas_units)
+    gas_page = next((c.gas_page_prices.get(m.stat) for m in gas_meters if c.gas_page_prices.get(m.stat) is not None), None)
+    gas_kwh = None if gas_page is None else gas_page / c.gas_contract().kwh_in(gas_unit)
     learned = c.offpeak_found
     services = sorted(n for n in (hass.services.async_services().get("notify") or {}) if n not in ("send_message", "notify"))
     return {
@@ -659,10 +664,13 @@ def found_settings(hass, c) -> dict:
         "prix_page": page_prices,
         "export_price": {"valeur": export, "source": "lu dans la page Énergie" if export is not None else None},
         "water_price": {"valeur": water, "source": "lu dans la page Énergie" if water is not None else None},
+        "gas_price": {"valeur": None if gas_kwh is None else round(gas_kwh, 4),
+                      "source": None if gas_kwh is None else "lu dans la page Énergie" if gas_unit != "m³" else "d'après le prix du m³ de la page Énergie"},
+        "gas_unit": gas_unit,
         "margin": {"valeur": 0.1, "source": "par défaut"},
         "sac_kg": (pellets or {}).get("bag_kg"),
         "notify": [{"id": f"notify.{n}", "nom": n.replace("mobile_app_", "").replace("_", " ").capitalize()} for n in services],
-        "a": {"revente": bool(page and page.exports), "eau": bool(page and page.water),
+        "a": {"revente": bool(page and page.exports), "eau": bool(page and page.water), "gaz": bool(gas_meters),
               "poele": bool(pellets) or any(_stove(m, c) for m in (page.gas if page else [])),
               "delestage": "versatile_thermostat" in hass.config.components and c.used("vt"),
               "un_compteur": bool(page) and not {"hp", "hc"} <= periods},
