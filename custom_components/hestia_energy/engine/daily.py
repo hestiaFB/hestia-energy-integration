@@ -5,8 +5,9 @@ they work from palier 0 (a Linky read by HA Linky):
 - the unusual day: the latest whole day far above the usual one (for its cold, with Hestia Météo);
 - the contract: off-peak hours that do not pay, from the days known hour by hour (HA Linky keeps the last seven);
 - the baseload: what the home draws when everything sleeps, from those same nights;
-- the heating: what one degree less would save this winter (the line through each day's cold, Hestia Météo);
 - the month: dearer than the same month a year before.
+
+No heating advice: the heating is Hestia Heating's (1.0.1b8).
 
 Plain Python. Each advice: {id, titre, pourquoi, euros_an, unite, rubrique} (PHRASES.md « Pistes »), most useful first;
 some also say {maintenant, mieux, gain, sous}: what is done today, what would be better, the euros shown (maquette D).
@@ -22,9 +23,7 @@ MIN_NIGHTS = 7
 CONTRACT_GAIN = 15.0       # € a year below which a change of option is not worth a word
 BASELOAD_W = 120           # a baseload below this is an ordinary home's
 BASELOAD_STEP_W = 50       # the gain of the baseload advice: what 50 W less would save
-HEATING_SHARE = 0.15       # the heating's share of the purchases below which one degree is not worth a word
 MONTH_SHARE, MONTH_EUR = 0.15, 10.0
-WINTER = (10, 11, 12, 1, 2, 3, 4)
 
 
 def _advice(ident: str, values: dict, euros_year: float | None, rubric: str | None) -> dict:
@@ -112,25 +111,6 @@ def baseload(home, price: float | None) -> dict | None:
     return out
 
 
-def heating_degree(home, now: datetime, cold: dict, learned, price: float | None) -> dict | None:
-    """« Baissez le chauffage d'un degré » in winter: one degree less is one degree-day less each heating day."""
-    local = now.astimezone(home.tz).date()
-    if local.month not in WINTER or learned is None or not learned.reliable or price is None:
-        return None
-    used = home.used_days()
-    year = [d for d in used if local - timedelta(days=365) <= d < local]
-    total = sum(used[d] for d in year)
-    heat = sum(learned.heat_kwh(cold.get(d)) or 0.0 for d in year)
-    heating_days = sum(1 for d in year if (cold.get(d) or 0) > 0)
-    if total <= 0 or heat / total < HEATING_SHARE or not heating_days:
-        return None
-    one_degree = learned.per_degree_kwh * heating_days * price
-    out = _advice("chauffage_degre", {"euros": phrases.euros(one_degree), "part": round(heat / total * 100)}, one_degree, "chauffage")
-    out.update({"nom": "Le chauffage", "maintenant": phrases.fill(phrases.BETTER["chauffage_degre"][0], {"part": round(heat / total * 100)}),
-                "mieux": phrases.BETTER["chauffage_degre"][1]})
-    return out
-
-
 def month_budget(last_year, projection: float | None, now: datetime) -> dict | None:
     """« Ce mois coûte plus que d'habitude » against the same month a year before, whole."""
     if projection is None or last_year is None or last_year.eur is None or now.day < 7:
@@ -147,7 +127,7 @@ def advices(home, contract, table, now: datetime, cold: dict, weather: bool, pri
     """Every advice that holds today: the unusual day first (it is news), then the most euros a year."""
     learned = heating.learn(home.used_days(), cold) if weather else None
     found = [unusual_day(home, contract, table, now, cold, learned), contract_option(home, contract, table, now),
-             baseload(home, price), heating_degree(home, now, cold, learned, price), month_budget(last_year, projection, now)]
+             baseload(home, price), month_budget(last_year, projection, now)]
     news = [a for a in found[:1] if a]
     rest = sorted((a for a in found[1:] if a), key=lambda a: -(a["euros_an"] or 0))
     return news + rest

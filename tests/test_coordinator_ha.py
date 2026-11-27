@@ -300,7 +300,7 @@ class FranksHome(unittest.IsolatedAsyncioTestCase):
         self.assertEqual(len(source["officielles"]), 3)
 
 
-    async def test_the_heating_estimated_from_the_cold(self):
+    async def test_the_cold_is_read_but_the_heating_is_not_guessed(self):
         """9.2: with Hestia Weather's degree-days (the station's, moved like the statistics), a figure for this month;
         without Hestia Weather, the rubric says what to add."""
         from replay import degree_days
@@ -326,15 +326,9 @@ class FranksHome(unittest.IsolatedAsyncioTestCase):
         self.hass.data["hestia_weather_api"] = Weather()
         await coordinator.async_refresh(full=True)
         heat = coordinator.data["chauffage"]
-        self.assertEqual(heat["etat"], "pret")
-        self.assertAlmostEqual(heat["par_degre_kwh"], 1.67, delta=0.1)
-        self.assertIsNotNone(heat["mois"])
-        # The replay's year starts on 7 Nov. 2025: last winter is known from November only, so it is not shown.
-        self.assertIsNone(heat["hiver_dernier"])
-        # The card's one period: the season, from 1 October; and what a degree of cold costs a day.
-        self.assertTrue(heat["saison"]["du"].endswith("-10-01"))
-        self.assertGreaterEqual(heat["saison"]["kwh"], heat["mois"]["kwh"])
-        self.assertGreater(heat["euros_par_degre"], 0.2)
+        self.assertEqual(heat["etat"], "meteo")
+        # The heating's share is Hestia Heating's (1.0.1b8): Énergie no longer guesses it from the cold.
+        self.assertFalse({"mois", "saison", "hiver_dernier", "euros_par_degre", "par_degre_kwh"} & set(heat))
 
     async def test_what_the_detail_cards_read(self):
         """Maquette des cartes 2 (INTERFACE.md § 4.2): one period per card, every figure from the view."""

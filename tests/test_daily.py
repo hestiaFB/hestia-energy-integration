@@ -33,23 +33,18 @@ class AdviceFromTheDays(unittest.TestCase):
         self.assertIn(" W.", found["pourquoi"])
         self.assertGreater(found["euros_an"], 200)
 
-    def test_one_degree_less_in_winter(self):
-        found = daily.heating_degree(self.home, NOW, degree_days(), __import__("engine.heating", fromlist=["learn"]).learn(
-            self.home.used_days(), degree_days()), self.price)
-        self.assertIsNotNone(found)
-        self.assertTrue(40 <= found["euros_an"] <= 150, found)
-
     def test_nothing_without_the_cold_nor_the_hours(self):
         base = report.contract_for(self.home, 9, None, {}, None, tariff.BASE)
         self.assertIsNone(daily.contract_option(self.home, base, self.table, NOW))
-        self.assertIsNone(daily.heating_degree(self.home, NOW, {}, None, self.price))
 
     def test_the_list_and_its_order(self):
         found = daily.advices(self.home, self.contract, self.table, NOW, degree_days(), True, self.price, None, None)
         print("\n".join(f"  {a['titre']} — {a['pourquoi']}" for a in found))
         money = [a["euros_an"] for a in found if a["id"] != "jour_inhabituel"]
         self.assertEqual(money, sorted(money, reverse=True))
-        self.assertTrue({"contrat_base", "veille_haute", "chauffage_degre"} <= {a["id"] for a in found})
+        self.assertTrue({"contrat_base", "veille_haute"} <= {a["id"] for a in found})
+        # The heating is Hestia Heating's: no advice on it here (Frank, 27 Nov. 2026).
+        self.assertFalse(any(a.get("rubrique") == "chauffage" for a in found))
 
 
 if __name__ == "__main__":

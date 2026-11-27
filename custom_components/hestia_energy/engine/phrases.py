@@ -51,7 +51,6 @@ PISTES = {
                      "Seulement {part} % de vos achats tombent en heures creuses ; elles rapportent à partir de {seuil} % "
                      "(mesuré sur {jours} jours).", "par an"),
     "veille_haute": ("Cherchez ce qui tourne la nuit", "Quand tout dort, la maison consomme encore {w} W.", "par an"),
-    "chauffage_degre": ("Baissez le chauffage d'un degré", "Le chauffage fait environ {part} % de vos achats.", "par hiver"),
     "budget_mois": ("Ce mois coûte plus que d'habitude",
                     "Au rythme actuel, environ {euros} € : {ecart} € de plus qu'en {mois} dernier.", None),
 }
@@ -59,8 +58,6 @@ PISTES = {
 BETTER = {
     "veille_haute": ("Quand tout dort, la maison consomme encore {w} W, jour et nuit : {euros} € par an.",
                      "Faites le tour avec les prises : box, écrans en veille, appareils oubliés. Coupez ce qui ne sert pas la nuit."),
-    "chauffage_degre": ("Le chauffage fait environ {part} % de vos achats d'électricité.",
-                        "Baissez la consigne d'un degré dans les pièces chauffées."),
 }
 # The tile's chip (PHRASES.md § 4): « Rien à faire », « À revoir », « Bon moment », « Demain rouge », « Urgent ».
 CHIP = {URGENT: "Urgent", GESTE: "À revoir", BENEFICE: "Bon moment", RIEN: "Rien à faire"}

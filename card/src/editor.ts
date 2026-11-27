@@ -11,7 +11,7 @@ export const FORMATS:[string,string,string,string][]=[
  ['tuile','mdi:dock-window','Tuile','en ce moment : une phrase, un chiffre'],
  ['conseils','mdi:piggy-bank-outline','Conseils','ce qui ferait économiser, en euros par an'],
  ['soleil','mdi:solar-power-variant','Soleil','ce que les panneaux ont produit aujourd’hui'],
- ['chauffage','mdi:fire','Chauffage','ce qu’a coûté la saison, depuis le 1er octobre'],
+ ['chauffage','mdi:fire','Chauffage','ce qu’a coûté le mois, compté par Hestia Chauffage'],
  ['veille','mdi:weather-night','Veille','ce qui tourne la nuit, les 30 dernières nuits'],
  ['eau','mdi:water','Eau','les litres et les euros du mois'],
  ['gaz','mdi:fire','Gaz','les m³ ou kWh et les euros du mois, abonnement compris'],

@@ -521,42 +521,20 @@ class EnergyCoordinator:
                 "officielles": list(sources.OFFICIAL)}
 
     def _heating(self, home, local: datetime, month, weather: str) -> dict:
-        """The heating estimated from the cold (9.2): one figure for this month and one for last winter, or why not."""
+        """The pellet stove counted by Énergie, and whether Hestia Weather gives the cold (for the unusual days).
+
+        The heating's share of the electricity is no longer guessed here (1.0.1b8): it is Hestia Heating's, which reads
+        each day's energy through the interface (api.days) and gives its cost back (cout_chauffage). Frank, 27 Nov.
+        2026: « si cela concerne le chauffage, cela doit aller à la brique chauffage. Sans chauffage on reste très bref »."""
         stove = self._stove(local)
         if weather != "oui":
             state = {"non": "sans_meteo", "ancienne": "meteo_ancienne", "incompatible": "meteo_incompatible",
                      "sans_lieu": "meteo_sans_lieu"}.get(weather, "sans_meteo")
             return {"etat": state, "poele": stove}
         if not any(d < local.date() for d in self.cold):
-            # Weather is there but gives no past day: its place has no temperature sensor, or none old enough. Said,
-            # never left « learning » for ever.
+            # Weather is there but gives no past day: its place has no temperature sensor, or none old enough.
             return {"etat": "meteo_sans_donnees", "lieu": self.weather.get("nom"), "poele": stove}
-        used = home.used_days()
-        learned = heating.learn(used, self.cold)
-        if learned is None:
-            return {"etat": "apprend", "jours": sum(1 for d in used if d in self.cold), "poele": stove}
-        if not learned.reliable:
-            return {"etat": "peu_lie", "poele": stove}
-        today = local.date()
-        this_month = heating.over(learned, self.cold, today.replace(day=1), today, month.bought_kwh, month.energy_eur)
-        # Last winter: October to April before this one (the heating season), at its own prices.
-        year = today.year if today.month >= 10 else today.year - 1
-        start, end = date(year - 1, 10, 1), date(year, 4, 30)
-        winter_report = report.period(home, self.contract, self.table, tariff.day_bounds(start, self.tz)[0],
-                                      tariff.day_bounds(end, self.tz)[1])
-        winter = heating.over(learned, self.cold, start, end, winter_report.bought_kwh, winter_report.energy_eur)
-        # The season so far (from 1 October, the card's one period): the radiators at the season's own average price.
-        first = cards.season_start(today)
-        season_report = report.period(home, self.contract, self.table, tariff.day_bounds(first, self.tz)[0], local)
-        season = heating.over(learned, self.cold, first, today, season_report.bought_kwh, season_report.energy_eur)
-        per_kwh = season.eur / season.kwh if season is not None and season.eur is not None and season.kwh > 0 else None
-        return {"etat": "pret", "mois": None if this_month is None else this_month.as_dict(),
-                "saison": None if season is None else {**season.as_dict(), "du": first.isoformat()},
-                "euros_par_degre": None if per_kwh is None else round(learned.per_degree_kwh * per_kwh, 3),
-                # A winter only shown nearly whole (9 days in 10): a part of it would look like a cheap winter.
-                "hiver_dernier": None if winter is None or winter.days < 0.9 * ((end - start).days + 1) else {**winter.as_dict(), "du": start.isoformat(),
-                                                                                    "au": end.isoformat()},
-                "par_degre_kwh": round(learned.per_degree_kwh, 2), "poele": stove}
+        return {"etat": "meteo", "poele": stove}
 
     def _stove(self, local: datetime) -> dict | None:
         """The pellet stove this month and this season (from October), in kilos and euros (9.1)."""

@@ -1,3 +1,11 @@
+## 1.0.1b8 — Le chauffage compté par Hestia Chauffage seulement
+
+### Changements
+
+- Énergie ne devine plus le chauffage. L’« électricité due au froid » (les radiateurs estimés d’après le froid de chaque jour), le prix d’un degré et le conseil « Baissez le chauffage d’un degré » sont retirés : ce qui concerne le chauffage, c’est Hestia Chauffage qui le dit. Elle lit chaque jour d’électricité et de gaz par l’interface d’Énergie (1.0.1b7) et en tire la part du chauffage.
+- La carte Chauffage et le Bilan montrent le coût que compte Hestia Chauffage, comme avant. Sans elle, une seule ligne : « Le chauffage est compté par Hestia Chauffage ». La tuile Chauffage de la vue d’ensemble n’apparaît qu’avec elle.
+- Hestia Weather sert toujours : un jour froid n’est pas pris pour un jour inhabituel.
+
 ## 1.0.1b7 — Le gaz compté comme l’électricité
 
 ### Nouveautés

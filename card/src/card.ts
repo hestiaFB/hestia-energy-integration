@@ -25,7 +25,6 @@ type Battery={decharge_w:number|null;charge_w:number|null;pourcent:number|null;c
 type Direct={achat_w:number|null;revente_w:number|null;soleil_w:number|null;maison_w:number|null;batterie?:Battery|null;periode:string|null;prix:number|null;couleur?:string|null;couleur_demain?:string|null;
  prochain_changement:{a:string;periode:string}|null;en_marche:Running[];bandeau:Banner;fuite:{minutes:number|null;debit:number};
  chauffage?:{pieces:{nom:string;w:number|null}[];w:number|null;euros_de_l_heure:number|null;sans_puissance:string[];poele:boolean}|null};
-type Heat={kwh:number;eur:number|null;jours:number};
 type Stove={mois:{kg:number;eur:number|null}|null;saison:{kg:number;eur:number|null};prix_kg:number|null;sac_kg:number|null;stock_kg?:number|null;jours_restants?:number|null};
 type View={pret:boolean;palier:number;equipement:{direct?:boolean;soleil?:boolean;appareils?:boolean};direct?:Direct;
  jour?:Period;hier?:Period;mois?:Period;mois_an_dernier?:Period;projection:number|null;
@@ -46,7 +45,7 @@ type View={pret:boolean;palier:number;equipement:{direct?:boolean;soleil?:boolea
  soleil_jour?:{plus_fort:{h:number;kwh:number}|null;prix_evite:number|null;groupes:{nom:string;kwh:number}[]};
  appareils_jour?:{appareils:{nom:string;kwh:number;euros:number|null}[];mesure_kwh:number;maison_kwh:number;sans_prise_kwh:number|null;prix_moyen:number|null}|null;
  pointe?:{h:number;kw:number;part:number|null}|null;
- chauffage?:{etat:string;mois?:Heat|null;saison?:(Heat&{du:string})|null;euros_par_degre?:number|null;poele?:Stove|null};
+ chauffage?:{etat:string;poele?:Stove|null};
  usage?:Usage|null;chauffe_eau?:Heater|null;cout_chauffage?:HeatCost|null;gaz?:Gas|null};
 /** The gas of the Energy page (1.0.1b7, engine/gas.py): what the home burns and what it costs, never what for. */
 type Gas={unite:string;prix:number|null;abonnement:number|null;mois:{q:number;euros:number|null;gaz_euros:number|null;abonnement_euros:number|null;fin_de_mois:number|null};
@@ -80,7 +79,7 @@ const ZONE:Record<string,[string,string|null,string]>={hc:['--nw-cold','moon','c
 const deviceIcon=(p:Piste)=>p.id==='chauffe_eau_heures'?'heater':/vaisselle/i.test(p.nom??'')?'dish':/s[eè]che/i.test(p.nom??'')?'dryer':/linge|laver/i.test(p.nom??'')?'washer':'plug';
 /** « 0 h 30 », « 19 h » from minutes after midnight, with no break inside. */
 const hm=(m:number)=>{const h=Math.floor(m/60)%24,mm=m%60;return mm?`${h}\u00a0h\u00a0${String(mm).padStart(2,'0')}`:`${h}\u00a0h`;};
-const PISTE_LOOK:Record<string,[string,string]>={veille_haute:['moon','--nw-watch'],chauffage_degre:['flame','--nw-heat'],contrat_base:['doc','--nw-benefit'],
+const PISTE_LOOK:Record<string,[string,string]>={veille_haute:['moon','--nw-watch'],contrat_base:['doc','--nw-benefit'],
  jour_inhabituel:['home','--nw-home'],budget_mois:['doc','--nw-home'],chauffe_eau_heures:['drop','--nw-cold'],machine_heures:['clock','--nw-home']};
 type Rubric=typeof RUBRICS[number];
 
@@ -512,10 +511,9 @@ class HestiaEnergyCard extends LitElement {
   const j=v.jour;
   if(v.equipement.soleil&&j?.soleil_kwh!=null)out.push(this._go('soleil','sun','--nw-sun','Soleil · aujourd\'hui',kwh(j.soleil_kwh),'kWh produits',
    j.soleil_garde!=null?`La maison en a gardé ${j.soleil_garde} %.`:j.soleil_kwh>0?'Une partie de la production n\'a pas été mesurée.':'Rien encore aujourd\'hui.'));
-  const heat=this._heatSum(v),hc=v.cout_chauffage;
+  const hc=v.cout_chauffage;
   if(hc)out.push(this._go('chauffage','flame','--nw-heat','Chauffage · ce mois-ci',hc.mois.chauffage_eur!=null?eur(hc.mois.chauffage_eur):'—','€',
    hc.aujourdhui.chauffage_eur!=null?`Aujourd'hui ${eur(hc.aujourdhui.chauffage_eur)} €, compté par Hestia Chauffage.`:'Compté par Hestia Chauffage.'));
-  else if(heat)out.push(this._go('chauffage','flame','--nw-heat','Chauffage · depuis le 1er octobre',heat.val,heat.unit,heat.say));
   if(v.veille)out.push(this._go('veille','moon','--nw-watch','Veille · chaque nuit',String(v.veille.w),'W quand tout dort',
    v.veille.euros_par_an!=null?`Environ ${year(v.veille.euros_par_an)} € par an.`:'Ce que tire la maison quand tout dort.'));
   const e=v.eau,leak=v.direct?.fuite?.minutes;
@@ -539,16 +537,6 @@ class HestiaEnergyCard extends LitElement {
    c.option==='base'&&c.prix_base!=null?`${price(c.prix_base)} € le kWh à toute heure.`:'Vos prix et vos heures.'));
   return out;
  }
- /** The heating season in one figure: stove and radiators together, or the one known. */
- private _heatSum(v:View):{val:string;unit:string;say:string;both:boolean}|null{
-  const h=v.chauffage,el=h?.etat==='pret'?h.saison:null,st=h?.poele?.saison;
-  if(el?.eur!=null&&st?.eur!=null)return {val:eur(el.eur+st.eur),unit:'€',say:`Poêle ${eur(st.eur)} €, radiateurs ${eur(el.eur)} €.`,both:true};
-  if(st)return {val:st.eur!=null?eur(st.eur):num(st.kg,0),unit:st.eur!=null?'€':'kg',say:`Poêle : ${num(st.kg,0)} kg de granulés.`,both:false};
-  if(el)return {val:el.eur!=null?eur(el.eur):kwh(el.kwh),unit:el.eur!=null?'€':'kWh',say:'Radiateurs, estimés d\'après le froid.',both:false};
-  if(h?.etat==='peu_lie')return {val:'—',unit:'',say:'Vous chauffez sans doute avec une autre énergie.',both:false};
-  return null;
- }
-
  /* ── « Votre contrat, bien utilisé » (maquette A, chosen by Frank on 19 Nov. 2026): the year's share of off-peak purchases
     against the share from which they pay, and whether the option and the power are the right ones. The devices that can
     wait are said in « Pour économiser » (maquette D, Frank on 19 Nov. 2026: today → better → the gain). ── */
@@ -712,38 +700,11 @@ class HestiaEnergyCard extends LitElement {
    </div>`;
  }
 
+ /** The heating is Hestia Chauffage's (Frank, 27 Nov. 2026): its own cost when it is there, else one line saying where. */
  private _heat(v:View,over:boolean){
   if(v.cout_chauffage)return this._heatCost(v,v.cout_chauffage,over);
-  const h=v.chauffage,st=h?.poele,stove=st?.saison,el=h?.etat==='pret'?h.saison:null,sum=this._heatSum(v);
-  const head={ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'depuis le 1er octobre',over};
-  const why:Record<string,string>={sans_meteo:'Pour estimer les radiateurs, Hestia a besoin du froid de chaque jour : ajoutez Hestia Météo.',
-   meteo_ancienne:'Pour estimer les radiateurs, Hestia a besoin du froid de chaque jour : mettez Hestia Météo à jour.',
-   meteo_incompatible:'Hestia Météo n\'a pas la même version qu\'Énergie : mettez les deux à jour ensemble.',
-   meteo_sans_lieu:'Pour estimer les radiateurs, ajoutez votre maison dans Hestia Météo.',
-   meteo_sans_donnees:'Hestia Météo ne donne pas le froid des jours passés : choisissez un capteur de température dans ses réglages.',
-   apprend:'Il faut quelques semaines de froid pour estimer les radiateurs. Revenez cet hiver.',
-   peu_lie:'Votre électricité varie peu avec le froid : vous chauffez sans doute surtout avec une autre énergie.'};
-  const how='Radiateurs : estimés en comparant chaque jour votre électricité au froid qu\'il a fait.';
-  let val='',unit='',cap='',answer:unknown;
-  if(sum?.both){val=sum.val;unit='€';cap='pour se chauffer';answer=html`Le poêle <b>${eur(stove!.eur)} €</b> de granulés, les radiateurs électriques <b>environ ${eur(el!.eur)} €</b>.`;}
-  else if(stove){[val,unit,cap]=stove.eur!=null?[eur(stove.eur),'€','de granulés pour le poêle']:[num(stove.kg,0),'kg','de granulés brûlés'];
-   answer=html`${stove.eur!=null?html`<b>${num(stove.kg,0)} kg</b> de granulés. `:''}${el?html`Les radiateurs, <b>environ ${el.eur!=null?`${eur(el.eur)} €`:`${kwh(el.kwh)} kWh`}</b>.`:why[h?.etat??'']??''}`;}
-  else if(el){[val,unit,cap]=el.eur!=null?[eur(el.eur),'€','de radiateurs, environ']:[kwh(el.kwh),'kWh','de radiateurs, environ'];answer=how;}
-  else return this._ans({...head,msg:h?.etat==='peu_lie'?'Une autre énergie chauffe la maison':'Le chauffage n\'est pas encore estimé',why:why[h?.etat??'']??'Ajoutez Hestia Météo, ou le suivi de votre poêle.'});
-  const share=sum?.both&&el?.eur!=null&&stove?.eur!=null?stove.eur/(stove.eur+el.eur):null;
-  const who=share==null?nothing:this._enc('Qui chauffe',share>=.4&&share<=.6?html`Le poêle et les radiateurs font <b>chacun la moitié</b> de la dépense.`
-    :html`${share>.6?'Le poêle fait':'Les radiateurs font'} <b>${Math.round((share>.6?share:1-share)*100)} %</b> de la dépense.`,
-   hb([{n:'Poêle',v:stove!.eur!,txt:`${eur(stove!.eur)} €`,sub:`${num(stove!.kg,0)} kg`},{n:'Radiateurs',v:el!.eur!,txt:`${eur(el!.eur)} €`,sub:`${kwh(el!.kwh)} kWh`}],'--nw-heat'),{foot:how});
-  const deg=h?.euros_par_degre;
-  const cold=deg!=null&&el?this._enc('Le froid fait la facture',html`Chaque degré de froid en plus coûte <b>environ ${cents(deg)} € par jour</b> de radiateurs.`,nothing,
-   {foot:html`Exemple : un jour à 5 °C au lieu de 10 °C, <b>${eur(deg*5)} €</b> de plus.`}):nothing;
-  const stock=st?.stock_kg;
-  const bags=stock!=null&&st?.sac_kg?Math.round(stock/st.sac_kg*10)/10:null;
-  const pellets=stock!=null&&stove?this._enc('Granulés en stock',stock<=0?html`<b>Plus de granulés</b> en stock.`
-    :html`Il reste <b>${bags!=null?`${num(bags,1)} sac${bags>1?'s':''} (${num(stock,0)} kg)`:`${num(stock,0)} kg`}</b>${st?.jours_restants!=null?html` : au rythme de cette saison, <b>environ ${st.jours_restants} jours</b> de poêle`:''}.`,
-   html`<div><div class="track" style="--c:var(--nw-heat)"><i style="width:${stove.kg+stock>0?stove.kg/(stove.kg+stock)*100:0}%"></i></div>
-    <div class="track-l"><span>brûlés <b>${num(stove.kg,0)} kg</b></span><span>en stock <b>${num(stock,0)} kg</b></span></div></div>`):nothing;
-  return html`${this._ans({...head,val,unit,cap,why:answer})}<div class="encs">${who}${cold}${pellets}</div>`;
+  return this._ans({ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'ce mois-ci',over,msg:'Le chauffage est compté par Hestia Chauffage',
+   why:'Installez Hestia Chauffage : il dit ce que coûtent les radiateurs et le poêle, d\'après le froid de chaque jour.'});
  }
 
  /** With Hestia Chauffage 1.1 or later: one cost of the heating, its own, shown as it is (Frank, 26 Nov. 2026). The

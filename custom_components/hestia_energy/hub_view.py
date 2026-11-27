@@ -11,7 +11,7 @@ from homeassistant.const import STATE_UNAVAILABLE
 from homeassistant.util import dt as dt_util
 
 from . import reader
-from .engine import gas as engine_gas, heating, hub, phrases, sources, tariff
+from .engine import gas as engine_gas, hub, phrases, sources, tariff
 
 # The extensions (H8): the other bricks first, then by theme. [key, group, name, what it brings, what happens without it
 # (said without « Sans elle / Sans lui » : the page gives the title, Frank 9 Nov. 2026), link]
@@ -521,17 +521,6 @@ def _abilities(hass, c, devices: list[dict]) -> list[dict]:
         add("veille", "Ce qui tourne la nuit", "non", "il faut la consommation heure par heure")
     else:
         add("veille", "Ce qui tourne la nuit", "attend", "après 7 nuits")
-    heat = d.get("chauffage") or {}
-    state = heat.get("etat")
-    if state == "pret":
-        add("chauffage", "Le chauffage selon le froid", "ok", "avec Hestia Weather")
-    elif state == "apprend":
-        add("chauffage", "Le chauffage selon le froid", "attend",
-            f"en apprentissage : {heat.get('jours') or 0} jours sur {heating.MIN_DAYS}")
-    elif state == "peu_lie":
-        add("chauffage", "Le chauffage selon le froid", "non", "la maison se chauffe surtout autrement")
-    else:
-        add("chauffage", "Le chauffage selon le froid", "non", "il faut Hestia Weather", "extensions/meteo")
     contract = c.contract
     if contract is not None and contract.option == tariff.TEMPO:
         found = bool(c.extras.get("tempo_today"))
