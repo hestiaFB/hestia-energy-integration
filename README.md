@@ -15,7 +15,7 @@
 
 Elle donne le résultat à **sa carte**, fournie avec elle, et à vos automatisations.
 
-> **Préversion (bêta) 1.0.1b7.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
+> **Préversion (bêta) 1.0.1b8.** Elle tourne chaque jour sur une vraie maison depuis début novembre 2026. Certains cas n’ont pas encore pu être vérifiés : voir [les limites de cette bêta](#limites).
 
 ![Hestia Énergie — l’électricité de la maison, expliquée en euros : la carte complète avec son horloge de la journée, la frise du lave-linge, entre « En ce moment » et « Ce mois-ci »](docs/images/hestia-energy-banner.png)
 
@@ -56,7 +56,7 @@ Elle part de votre contrat et de ce qu’Enedis mesure. Elle conseille ; elle ne
 
 Chaque étape, avec ce que vous devez voir à la fin : [l’installation pas à pas](docs/installation.md).
 
-**Quand les chiffres arrivent** : les euros du jour, du mois et de l’année tout de suite, si l’historique existe déjà dans Home Assistant ; ce qui tourne la nuit et le conseil sur l’option du contrat après 7 nuits mesurées heure par heure ; le prix d’un degré de chauffage en moins après quelques semaines d’hiver, avec Hestia Weather.
+**Quand les chiffres arrivent** : les euros du jour, du mois et de l’année tout de suite, si l’historique existe déjà dans Home Assistant ; ce qui tourne la nuit et le conseil sur l’option du contrat après 7 nuits mesurées heure par heure . Le chauffage, lui, est compté par Hestia Chauffage.
 
 ## Ce qu’Énergie fait selon votre équipement
 

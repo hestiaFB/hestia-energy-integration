@@ -61,7 +61,7 @@ La carte est fournie par l’intégration : rien d’autre à installer.
 
 - **Tout de suite** : les euros du jour, du mois et des douze derniers mois, si l’historique existe déjà dans Home Assistant.
 - **Après 7 nuits** mesurées heure par heure : ce qui tourne la nuit, et le conseil sur l’option du contrat.
-- **Avec Hestia Weather, après quelques semaines d’hiver** : le prix d’un degré de chauffage en moins.
+- **Avec Hestia Chauffage** : ce qu’a coûté le chauffage, qu’elle compte elle-même.
 
 ## Ce qu’Énergie fait selon votre équipement
 

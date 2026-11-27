@@ -10,7 +10,7 @@ Une seule carte, **Hestia Énergie**, en plusieurs formats. Chacun répond à un
 | **Tuile** | En ce moment : une phrase, un chiffre. « La maison consomme 1,3 kW. » Quand il n’y a rien à faire, le meilleur conseil. |
 | **Conseils** | Ce qui ferait économiser, en euros par an, du plus rentable au moins rentable. |
 | **Soleil** | Ce que les panneaux ont produit aujourd’hui, groupe par groupe. |
-| **Chauffage** | Ce qu’a coûté la saison, depuis le 1er octobre : radiateurs et poêle. Avec Hestia Chauffage 1.1 ou plus récente : le coût qu’elle compte, aujourd’hui, hier et ce mois-ci (un seul coût du chauffage). |
+| **Chauffage** | Le coût que compte Hestia Chauffage (1.1 ou plus récente) : aujourd’hui, hier et ce mois-ci, radiateurs, poêle et gaz. Sans elle, la carte est cachée (elle n’apparaît qu’en modifiant le tableau de bord), comme la tuile et la partie du Bilan : Énergie compte l’énergie, pas ce à quoi elle a servi. |
 | **Veille** | Ce qui tourne la nuit, sur les 30 dernières nuits, et ce que ça coûte par an. |
 | **Eau** | Les litres et les euros du mois, jour par jour. |
 | **Appareils** | Ce que chaque appareil a consommé aujourd’hui, en kWh et en euros. |

@@ -4,7 +4,7 @@ Hestia Énergie fonctionne avec la seule page Énergie. Chaque extension install
 
 | Extension | Ce qu’elle apporte |
 | --- | --- |
-| [Hestia Weather](https://github.com/hestiaFB/hestia-weather-integration) (3.3.0 ou plus récent) | Le froid de chaque jour : votre chauffage comparé à la météo, et le prix d’un degré en moins |
+| [Hestia Weather](https://github.com/hestiaFB/hestia-weather-integration) (3.3.0 ou plus récent) | Le froid de chaque jour : un jour froid n’est pas pris pour un jour inhabituel |
 | [HA Linky](https://github.com/bokub/ha-linky) | Les chiffres d’Enedis, qui font foi pour la facture |
 | [Linky en direct](https://github.com/hekmon/linkytic) (LiXee, linkytic) | Le prix de l’heure, la pointe, le bon moment pour une machine |
 | [RTE Tempo](https://github.com/hekmon/rtetempo) | La couleur du jour et du lendemain, pour l’option Tempo |
