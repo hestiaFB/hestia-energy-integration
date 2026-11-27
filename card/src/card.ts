@@ -180,8 +180,8 @@ const H_TICKS=html`<div class="ticks"><span>0 h</span><span>6 h</span><span>12 h
 
 class HestiaEnergyCard extends LitElement {
  static styles=[unsafeCSS(charte),unsafeCSS(energy)];
- static properties={_view:{state:true},_open:{state:true},_folded:{state:true},_error:{state:true},_hover:{state:true},_pin:{state:true}};
- declare _view?:View;declare _open?:Rubric;declare _folded:Set<string>;declare _error?:string;
+ static properties={preview:{type:Boolean},editMode:{type:Boolean},_view:{state:true},_open:{state:true},_folded:{state:true},_error:{state:true},_hover:{state:true},_pin:{state:true}};
+ declare preview?:boolean;declare editMode?:boolean;declare _view?:View;declare _open?:Rubric;declare _folded:Set<string>;declare _error?:string;
  /** The clock's hour under the pointer or the focus, and the one pinned by a click or a tap (the magnifier). */
  declare _hover?:number;declare _pin?:number;
  private _hass?:Hass;private _config:Config={type:'custom:hestia-energy-card',card:'complete'};private _stop?:()=>void;private _again?:number;
@@ -221,6 +221,10 @@ class HestiaEnergyCard extends LitElement {
   if(this._error&&!v)return html`<ha-card><div class="empty">${this._error}</div></ha-card>`;
   if(!v||!v.pret)return html`<ha-card><div class="empty">Hestia Énergie lit la page Énergie…</div></ha-card>`;
   const card=this._config.card;
+  // The Chauffage card only with Hestia Chauffage (Frank, 27 Nov. 2026): hidden, except while the dashboard is edited.
+  const hide=card==='chauffage'&&!v.cout_chauffage&&!this.preview&&!this.editMode;
+  this.style.display=hide?'none':'';
+  if(hide)return nothing;
   if(card==='tuile')return this._tile(v);
   if(card==='conseils')return this._advice(v);
   if(card!=='complete')return html`<ha-card>${this._detail(v,card as Rubric,false)}</ha-card>`;
@@ -703,8 +707,8 @@ class HestiaEnergyCard extends LitElement {
  /** The heating is Hestia Chauffage's (Frank, 27 Nov. 2026): its own cost when it is there, else one line saying where. */
  private _heat(v:View,over:boolean){
   if(v.cout_chauffage)return this._heatCost(v,v.cout_chauffage,over);
-  return this._ans({ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'ce mois-ci',over,msg:'Le chauffage est compté par Hestia Chauffage',
-   why:'Installez Hestia Chauffage : il dit ce que coûtent les radiateurs et le poêle, d\'après le froid de chaque jour.'});
+  return this._ans({ic:'flame',c:'--nw-heat',subject:'Chauffage',period:'ce mois-ci',over,msg:'Cette carte a besoin de Hestia Chauffage',
+   why:'Sans Hestia Chauffage, elle reste cachée sur le tableau de bord. Installée, elle dit ce que coûtent les radiateurs, le poêle et le gaz pour chauffer.'});
  }
 
  /** With Hestia Chauffage 1.1 or later: one cost of the heating, its own, shown as it is (Frank, 26 Nov. 2026). The

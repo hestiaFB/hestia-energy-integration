@@ -565,14 +565,14 @@ export class HestiaEnergySetup extends LitElement {
   // With Hestia Chauffage 1.1 or later, its own cost of the heating, shown as it is (one cost, Frank on 26 Nov. 2026).
   const heatRows=hc?[listRow({label:`Depuis le 1er ${month}`,value:eur(hc.chauffage_eur),sub:cap([hc.electrique_kwh?`Radiateurs ${hc.electrique_eur!=null?eur(hc.electrique_eur):kwh(hc.electrique_kwh)}`:'',
     hc.granules_kg?`poêle ${hc.granules_eur!=null?eur(hc.granules_eur):num(hc.granules_kg)+' kg'}`:''].filter(Boolean).join(', ')+'. Compté par Hestia Chauffage.')})]
-   :[listRow({label:'Compté par Hestia Chauffage',sub:'Installez Hestia Chauffage pour savoir ce que coûtent les radiateurs et le poêle.'})];
+   :[];
   return html`${this.head('Bilan',{lead:'Ce mois-ci et les 12 derniers mois, abonnement compris',help:'Calculés avec les chiffres d’Enedis, qui font foi, et le prix de chaque jour. Un jour sans prix connu n’est jamais compté gratuit.'})}
    ${now}
    ${listSection('',[listRow({label:html`<span class="big">${num(total,0)} €</span>`,sub:`De ${first} à ${final}.${h.soleil&&sun!=null?` Le soleil a fourni ${sun} % de la maison.`:''}${known.length<ms.length?` ${ms.length-known.length} mois sans prix connu.`:''}`,
     value:h.soleil&&resale>0?this.pill('benefit',`${num(resale,0)} € de revente`):undefined})])}
    ${listSection('Mois par mois',ms.slice().reverse().map(p=>listRow({label:label(p),sub:h.soleil&&p.soleil_couvre!=null?`Le soleil a couvert ${p.soleil_couvre} %`:undefined,
     value:p.euros==null?'—':html`<span class="mbar"><i style=${`width:${Math.round(p.euros/max*100)}%`}></i></span><span class="money">${num(p.euros,0)} €</span>`})))}
-   ${heatRows.length?listSection('Le chauffage',heatRows,{help:'Énergie compte l’électricité et le gaz. Ce qui a servi à chauffer, c’est Hestia Chauffage qui le dit, d’après le froid de chaque jour.'}):nothing}
+   ${heatRows.length?listSection('Le chauffage',heatRows,{help:'Compté par Hestia Chauffage, d’après le froid de chaque jour. Sans elle, cette partie n’apparaît pas : Énergie compte l’énergie, pas ce à quoi elle a servi.'}):nothing}
    ${water?listSection('L’eau',[listRow({label:`Depuis le 1er ${month}`,value:eur(water.mois_euros),sub:`${num(water.mois_l)} litres.`})]):nothing}
    ${g?listSection('Le gaz',[listRow({label:`Depuis le 1er ${month}`,value:eur(g.mois.euros),
      sub:`${num(g.mois.q,g.unite==='m³'?1:0)} ${g.unite}${g.mois.abonnement_euros!=null?', abonnement compris':''}.${g.mois.fin_de_mois!=null?` Prévu pour ${month} : environ ${eur(g.mois.fin_de_mois)}.`:''}`}),
