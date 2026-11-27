@@ -169,6 +169,36 @@ class HestiaEnergyApi:
                 "next": found.get("prochaine_chauffe"), "until": found.get("jusqu_a"), "plan": list(found.get("plan") or []),
                 "mode": found.get("mode"), "simulation": found.get("simulation")}
 
+    def days(self, start: date, end: date) -> list[dict]:
+        """Each whole day's energy from `start` to `end` (both included, at most 400 days), for Hestia Heating to find
+        the heating's share against the cold (1.0.1b7; Frank, 27 Nov. 2026: what concerns the heating is Hestia
+        Heating's). Each: `day` (a date), `electricity_kwh` (the home's consumption) and `electricity_complete`;
+        `gas_kwh`, `gas_quantity` (in `gas_unit`: « kWh » or « m³ ») and `gas_complete` when the home has gas.
+        Quantities only, no use guessed: the heating, the cooking and the hot water are together. Empty without data."""
+        if not self.coordinator or start > end or (end - start).days > 400:
+            return []
+        c = self.coordinator
+        found = c.energy_days
+        unit = ((c.data or {}).get("gaz") or {}).get("unite")
+        out = []
+        for day in sorted(d for d in found if start <= d <= end):
+            entry = {"day": day, **found[day]}
+            if "gas_kwh" in entry:
+                entry["gas_unit"] = unit
+            out.append(entry)
+        return out
+
+    def gas_price(self) -> float | None:
+        """The price of a kWh of gas, taxes included, in euros (1.0.1b7): the household's from Réglages, else the
+        Energy page's (a price per m³ divided by the kWh in a m³). None without gas or without a price: never free."""
+        if not self.coordinator:
+            return None
+        found = (self.coordinator.data or {}).get("gaz") or {}
+        price = found.get("prix")
+        if price is None:
+            return None
+        return round(price / (found.get("kwh_par_m3") or 1.0), 5)
+
     def limits(self) -> dict | None:
         if not self.coordinator:
             return None

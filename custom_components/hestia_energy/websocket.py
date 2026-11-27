@@ -21,7 +21,7 @@ VIEW_VERSION = 1
 # out of their view (33 kB → about 10 kB; audit of 9 Nov. 2026).
 CARD_KEYS = ("pret", "palier", "equipement", "direct", "jour", "hier", "mois", "mois_an_dernier", "projection", "jusqu_ici",
              "dernier_jour", "pistes", "veille", "veille_historique", "heures_creuses", "contrat", "heures", "eau",
-             "chauffage", "panneaux", "soleil_jour", "appareils_jour", "pointe", "usage", "chauffe_eau", "cout_chauffage")
+             "chauffage", "panneaux", "soleil_jour", "appareils_jour", "pointe", "usage", "chauffe_eau", "cout_chauffage", "gaz")
 
 
 def _coordinator(hass):
@@ -190,6 +190,10 @@ SETTINGS = vol.Schema({
     vol.Optional("subscription"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=5000))),
     vol.Optional("water_price"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=50))),
     vol.Optional("stove_fuel"): vol.Any(None, vol.In(("pellets", "gas"))),
+    # 1.0.1b7, the gas bill (engine/gas.py), taxes included: a kWh, a month's subscription (CTA included), kWh a m³
+    vol.Optional("gas_price"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=2))),
+    vol.Optional("gas_subscription"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=0, max=500))),
+    vol.Optional("gas_kwh_m3"): vol.Any(None, vol.All(vol.Coerce(float), vol.Range(min=5, max=15))),
     # the Hestia Weather place (its entry id) that gives the cold; None: the only one, or the first
     vol.Optional("weather_place"): vol.Any(None, vol.All(str, vol.Length(min=1, max=64))),
     # 1.0.1b3: the home battery's charge sensor (%) and its usable kWh; None: found and learned by Hestia
@@ -215,7 +219,7 @@ SETTINGS = vol.Schema({
 KEYS = ("kva", "margin", "export_price", "option", "bag_price", "notify_service", "notify_hour", "offpeak", "offpeak_weekend", "offer", "price_hp",
         "price_hc", "price_base", "subscription", "water_price", "stove_fuel", "notify_day", "notify_week", "notify_month",
         "notify_leak", "notify_forgot", "groups", "extensions", "weather_place", "chauffe_eau",
-        "battery_soc", "battery_kwh")
+        "battery_soc", "battery_kwh", "gas_price", "gas_subscription", "gas_kwh_m3")
 
 
 # The contract's settings an automation may change (issue 18: an offer Hestia does not know, its hours and prices

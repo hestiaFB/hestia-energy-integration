@@ -27,7 +27,7 @@ from .chauffe_eau import WaterHeater
 from .const import DOMAIN
 from .engine import battery as engine_battery
 from .engine import water_heater as engine_heater
-from .engine import advice, anomaly, baseline, cards, daily, habits, health, heating, hub, solar, home as engine_home, live, phrases, report, sources, stats, tariff
+from .engine import advice, anomaly, baseline, cards, daily, gas, habits, health, heating, hub, solar, home as engine_home, live, phrases, report, sources, stats, tariff
 from .engine.rows import Rows, merge as merge_rows
 
 _LOGGER = logging.getLogger(__name__)
@@ -53,6 +53,9 @@ DEFAULTS = {"kva": None, "option": None, "margin": 0.1, "watched": {"seche_servi
             "offer": None, "price_hp": None, "price_hc": None, "price_base": None, "subscription": None,
             # The water's price a cubic metre, when the Energy page has none or a wrong one.
             "water_price": None,
+            # The gas bill's own lines (engine/gas.py), taxes included, each left empty until typed: the price of a
+            # kWh (else the Energy page's), the subscription of a month (the CTA included), the kWh in a cubic metre.
+            "gas_price": None, "gas_subscription": None, "gas_kwh_m3": None,
             # What a stove declared as gas in the Energy page burns: « pellets », « gas », or None (not said yet).
             "stove_fuel": None,
             # The Hestia Weather place that gives the cold of each day (its entry id); None: the only one, or the first.
@@ -126,6 +129,10 @@ class EnergyCoordinator:
         self.found_extras: dict = {}                       # the extensions found, before those switched off (H8)
         self.page_prices: dict = {}                        # the prices the Energy page gives now
         self.meter_prices: dict = {}                       # each meter's own price, when one period has several meters
+        self.gas_units: dict[str, str | None] = {}         # each gas meter's unit (« kWh » or « m³ »), from its statistics
+        self.gas_page_prices: dict[str, float] = {}        # each gas meter's price on the Energy page now, per unit
+        # Each whole day's electricity and gas, for the other bricks (api.days): built with the reports.
+        self.energy_days: dict[date, dict] = {}
         self._alerted: set[str] = set()                    # the alerts already sent (leak, forgotten device)
         self.contract: tariff.Contract | None = None
         self.locality: dict[str, bool | None] = {}
@@ -388,6 +395,7 @@ class EnergyCoordinator:
         now = dt_util.utcnow()
         meta = await reader.metadata(self.hass, ids)
         self.level = sources.equipment(self.page, meta)
+        self.gas_units = {m.stat: sources.gas_unit(meta.get(m.stat)) for m in self.page.gas}
         start = now - timedelta(days=YEAR_DAYS if full or not self.rows else RECENT_DAYS)
         fresh = {sid: Rows.of(values) for sid, values in (await reader.hourly(self.hass, ids, start)).items()}
         self.rows = fresh if full or not self.rows else _merge(self.rows, fresh, start)
@@ -433,6 +441,7 @@ class EnergyCoordinator:
         await self._fetch_colours(now)
         prices, export_price = self._prices(now), self._export_price()
         self.page_prices = dict(prices)
+        self.gas_page_prices = self._gas_page_prices()
         self.panel_names = {c: solar.panel_name(_friendly(self.hass, c)) for c in self.extras["channels"]}
         self.device_names = {m.stat: _device_name(_friendly(self.hass, m.stat)) for m in self.page.devices if not m.name}
         self.inverter_silent = self._inverter_silent()
@@ -611,6 +620,47 @@ class EnergyCoordinator:
                 return value
         return None
 
+    def gas_contract(self) -> gas.Contract:
+        """The gas bill's lines as typed in Réglages (each may be empty)."""
+        s = self.settings
+        return gas.Contract(s.get("gas_price"), s.get("gas_subscription"), s.get("gas_kwh_m3"))
+
+    def _gas_page_prices(self) -> dict[str, float]:
+        """Each gas meter's price as the Energy page gives it now (an entity or a number), per unit of the meter."""
+        out = {}
+        for meter in self.page.gas if self.page else []:
+            value = _number(self.hass.states.get(meter.price.entity)) if meter.price.entity else meter.price.number
+            if value is not None:
+                out[meter.stat] = value
+        return out
+
+    def _gas(self, home, local: datetime) -> dict | None:
+        """The gas of the Energy page, like the electricity: this month, the bill, the twelve months (engine/gas.py).
+        Never what it is used for: the heating's share is Hestia Heating's. A stove declared as gas is the stove's."""
+        readings = [r for r in home.of("gas") if not hub_view._stove(r.meter, self)]
+        unit = gas.unit_of([r.meter.stat for r in readings], self.gas_units)
+        contract = self.gas_contract()
+        found = gas.days(readings, self.gas_units, self.tz, contract)
+        page = [self.gas_page_prices.get(r.meter.stat) for r in readings if self.gas_units.get(r.meter.stat) == unit]
+        # One price: the household's, else the page's when every meter has the same.
+        page_price = page[0] if page and all(p is not None and p == page[0] for p in page) else None
+        price = contract.unit_price(unit, page_price)
+        self._energy_days(home, found)
+        out = gas.summary(found, unit, price, contract, local)
+        if out is not None:
+            out["compteurs"] = len(readings)
+        return out
+
+    def _energy_days(self, home, found: dict) -> None:
+        """Each day's electricity and gas, kept for the other bricks (api.days): plain figures, read without work."""
+        days: dict[date, dict] = {}
+        for day, t in home.consumption_days().items():
+            days[day] = {"electricity_kwh": round(t.kwh, 3), "electricity_complete": bool(t.complete and t.hours >= 23)}
+        for day, g in found.items():
+            days.setdefault(day, {}).update({"gas_kwh": round(g.kwh, 3), "gas_quantity": round(g.quantity, 4),
+                                            "gas_complete": g.complete})
+        self.energy_days = days
+
     def _reports(self, now: datetime, prices: dict, export_price: float | None) -> dict:
         """Everything the reports say (worker thread: plain Python only, no state read)."""
         home = self.home
@@ -700,6 +750,7 @@ class EnergyCoordinator:
             "heures": {"aujourdhui": hours_today, "hier": _hours(home, local.date() - timedelta(days=1))},
             "veille_historique": nights,
             "eau": _water(home, now, self.settings.get("water_price")),
+            "gaz": self._gas(home, local),
             "panneaux": panels,
             # The detail cards, one period each (maquette des cartes 2): the sun today, the devices today, the peak today.
             "soleil_jour": {"plus_fort": cards.sun_today(hours_today), "prix_evite": avoided,

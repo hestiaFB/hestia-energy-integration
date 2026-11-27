@@ -14,6 +14,7 @@ export const FORMATS:[string,string,string,string][]=[
  ['chauffage','mdi:fire','Chauffage','ce qu’a coûté la saison, depuis le 1er octobre'],
  ['veille','mdi:weather-night','Veille','ce qui tourne la nuit, les 30 dernières nuits'],
  ['eau','mdi:water','Eau','les litres et les euros du mois'],
+ ['gaz','mdi:fire','Gaz','les m³ ou kWh et les euros du mois, abonnement compris'],
  ['appareils','mdi:power-plug','Appareils','ce que chaque appareil a consommé aujourd’hui'],
  ['pointe','mdi:transmission-tower','Pointe','la plus forte puissance prise aujourd’hui'],
  ['contrat','mdi:file-document-outline','Contrat','vos heures creuses et vos prix, ce mois-ci'],

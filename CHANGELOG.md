@@ -1,3 +1,12 @@
+## 1.0.1b7 — Le gaz compté comme l’électricité
+
+### Nouveautés
+
+- **Le gaz de la page Énergie est compté**, comme l’électricité : ce que la maison brûle chaque jour, en m³ ou en kWh selon le compteur, et ce que ça coûte. Une nouvelle carte **Gaz** (comme la carte Eau) : le mois, abonnement compris, la fin du mois prévue, le jour par jour et la facture du mois. Dans le Bilan, « Le gaz » : le mois et les 12 derniers mois.
+- Réglages, « Le gaz » : trois lignes de la facture, taxes comprises. Le prix du kWh (vide : celui de la page Énergie), l’abonnement par mois (CTA comprise) et, pour un compteur en m³, les kWh dans un m³ (11,2 si vide).
+- Énergie ne dit pas à quoi sert le gaz : chauffage, cuisine et eau chaude sont ensemble. La part du chauffage sera comptée par Hestia Chauffage, qui lit chaque jour d’énergie par l’interface d’Énergie (`days`) avec le prix du kWh de gaz (`gas_price`), deux ajouts compatibles.
+- Merci à Yann Le Gall, dont la proposition (PR 23) a donné les unités, la facture et la méthode que reprendra Hestia Chauffage.
+
 ## 1.0.1b6 — Le soleil gardé quand il coûte moins que la nuit, la marche forcée comptée à part
 
 ### Améliorations

@@ -364,6 +364,9 @@ button.piste:focus-visible { outline:2px solid var(--nw-accent); outline-offset:
 .duo + .nw-legend { margin-top:8px; justify-content:flex-start; }
 .hb.list .dot { display:inline-block; width:8px; height:8px; border-radius:50%; background:var(--c); margin-right:6px; vertical-align:1px; }
 .ans-n { color:var(--nw-fg2); }
+.gas-bill { display:flex; flex-direction:column; gap:6px; font-size:var(--nw-fs,14px); }
+.gas-bill > div { display:flex; justify-content:space-between; gap:12px; }
+.gas-bill span { color:var(--nw-fg2); }
 .whf { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:8px 12px; }
 .whb { font:inherit; font-weight:600; color:var(--nw-water); background:color-mix(in oklab, var(--nw-water) 12%, transparent);
   border:1px solid color-mix(in oklab, var(--nw-water) 35%, transparent); border-radius:999px; padding:6px 12px; cursor:pointer; }
